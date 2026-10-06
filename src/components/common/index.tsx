@@ -238,7 +238,7 @@ export function Choice({
   selected = false,
   onClick,
 }: {
-  icon: string
+  icon?: string
   title: string
   detail: string
   selected?: boolean
@@ -253,9 +253,11 @@ export function Choice({
       }`}
       onClick={onClick}
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#edf2fa]">
-        <Icon size={20} src={icon} />
-      </span>
+      {icon && (
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#edf2fa]">
+          <Icon size={20} src={icon} />
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-[#031f50]">{title}</p>
         <p className="mt-1 text-xs leading-[1.45] text-[#53657c]">{detail}</p>

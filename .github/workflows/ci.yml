@@ -1,0 +1,100 @@
+name: WelliRecord Mobile CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: 🩺 Validate & Build Web Preview
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚡ Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: ⚙️ Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🔍 TypeScript Typecheck
+        run: pnpm exec tsc --noEmit
+
+      - name: 🏗️ Build production web bundle
+        run: pnpm run build
+
+      - name: 📤 Upload Web Bundle Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wellirecord-web-bundle
+          path: dist/
+          retention-days: 7
+
+  eas-preview-apk:
+    name: 📱 Build Standalone Android Preview APK
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚡ Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: ⚙️ Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🚀 Setup Expo & EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📲 Trigger Standalone APK Build (EAS Preview)
+        if: env.EXPO_TOKEN != ''
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          echo "Starting EAS Build for Android Preview APK..."
+          npx eas-cli build --platform android --profile preview --non-interactive
+
+      - name: ℹ️ EAS Setup Guidance (If EXPO_TOKEN is missing)
+        if: env.EXPO_TOKEN == ''
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          echo "================================================================="
+          echo "💡 EXPO_TOKEN secret is not set yet in GitHub Repository Secrets!"
+          echo "To enable automatic cloud APK builds on every push to main:"
+          echo "1. Go to https://expo.dev/settings/access-tokens and create a token."
+          echo "2. In your GitHub repo, go to Settings -> Secrets and variables -> Actions."
+          echo "3. Add a repository secret named 'EXPO_TOKEN' with your Expo token."
+          echo "Next time you push to main, EAS will automatically build your APK!"
+          echo "================================================================="
