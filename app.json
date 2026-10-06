@@ -1,0 +1,77 @@
+{
+  "expo": {
+    "name": "WelliRecord",
+    "slug": "welli-record-mobile",
+    "scheme": "wellirecord",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "jsEngine": "hermes",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#041E42"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.wellirecord.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyCE9x1cTlCqdr675wPmvonFoQclx4rqGag"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSFaceIDUsageDescription": "WelliRecord uses Face ID to securely unlock your health records.",
+        "NSCameraUsageDescription": "WelliRecord uses the camera to scan documents and prescription slips.",
+        "NSPhotoLibraryUsageDescription": "WelliRecord accesses your photo library so you can upload medical records from your camera roll."
+      },
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.wellirecord.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDzusF6aOxUXg3hR2Bf1HxjSAJrUh0fjk4"
+        }
+      },
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#041E42"
+      },
+      "versionCode": 1
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "8cb412e2-9501-464c-956e-a0a4a76e1b32"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-image-picker",
+      "expo-local-authentication",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#041E42"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          }
+        }
+      ]
+    ]
+  }
+}

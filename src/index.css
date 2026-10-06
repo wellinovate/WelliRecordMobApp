@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Inter:Bold";
+  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "Inter:Medium";
+  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: "Inter:Regular";
+  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Inter:Semi Bold";
+  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+}
+
+:root {
+  font-family: "Inter:Regular", Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #031f50;
+  background: #f7f9fc;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100dvh;
+}
+
+.app-header {
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.welliid-card {
+  border-color: #031f50 !important;
+  background: #031f50 !important;
+  color: #ffffff !important;
+  box-shadow: 0 18px 36px rgb(3 31 80 / 14%);
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    padding-top: max(28px, env(safe-area-inset-top));
+  }
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.font-bold {
+  font-family: "Inter:Bold", Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-semibold {
+  font-family: "Inter:Semi Bold", Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-medium {
+  font-family: "Inter:Medium", Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.stack {
+  display: grid;
+  gap: 20px;
+}
+
+@media (min-width: 720px) {
+  .stack {
+    gap: 22px;
+  }
+}
