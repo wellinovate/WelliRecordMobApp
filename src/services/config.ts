@@ -10,4 +10,5 @@ export const CONFIG = {
   emergencyKey: "wr_emergency_profile_cache",
   medicationsKey: "wr_medications_cache",
   syncQueueKey: "wr_sync_queue",
+  preferencesKey: "wr_preferences",
 }

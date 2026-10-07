@@ -49,7 +49,7 @@
       "output": "static"
     },
     "experiments": {
-      "typedRoutes": false
+      "typedRoutes": true
     },
     "extra": {
       "eas": {

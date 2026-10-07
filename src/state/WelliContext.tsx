@@ -32,6 +32,8 @@ interface WelliContextType {
   confirmBooking: () => void
   confirmCheckIn: () => void
   confirmRevocation: () => void
+  approveConsent: () => void
+  rejectConsent: () => void
   activateEmergency: () => void
   endEmergency: () => void
 }
@@ -148,6 +150,16 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
     router.push("/(tabs)/consent-expanded")
   }
 
+  const approveConsent = () => {
+    hapticFeedback.success()
+    setPendingConsent("approved")
+  }
+
+  const rejectConsent = () => {
+    hapticFeedback.warning()
+    setPendingConsent("rejected")
+  }
+
   const activateEmergency = () => {
     hapticFeedback.heavy()
     setEmergencyActive(true)
@@ -183,6 +195,8 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
         confirmBooking,
         confirmCheckIn,
         confirmRevocation,
+        approveConsent,
+        rejectConsent,
         activateEmergency,
         endEmergency,
       }}
