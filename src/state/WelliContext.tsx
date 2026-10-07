@@ -4,7 +4,8 @@ import { CareStage, PendingConsent } from "../types/navigation"
 import { hapticFeedback } from "../utils/haptics"
 import { storage } from "../utils/storage"
 import { offlineSyncService, EmergencyOfflineProfile } from "../services/offlineSyncService"
-import { authenticateWithBiometrics } from "../utils/biometrics"
+import { TOKEN_KEY, setUnauthorizedHandler } from "../services/apiClient"
+import { fetchProfile, type AuthSession, type SessionUser } from "../services/authService"
 
 const SETUP_COMPLETE_KEY = "wellirecord-setup-complete"
 
@@ -14,6 +15,7 @@ interface WelliContextType {
   // for this before deciding whether to show the auth stack or the tabs.
   isAuthReady: boolean
   isAuthenticated: boolean
+  user: SessionUser | null
   setupFlow: boolean
   recordAdded: boolean
   careStage: CareStage
@@ -26,8 +28,10 @@ interface WelliContextType {
   addRecord: () => void
   startAccountCreation: () => void
   completeOnboarding: (target?: "home" | "records") => void
+  // Stores the token returned by OTP verification. Does not navigate: the
+  // caller decides whether this is a login (signIn) or onboarding continues.
+  establishSession: (session: AuthSession) => Promise<void>
   signIn: () => void
-  signInWithBiometrics: () => Promise<boolean>
   signOut: () => void
   confirmBooking: () => void
   confirmCheckIn: () => void
@@ -38,11 +42,28 @@ interface WelliContextType {
   endEmergency: () => void
 }
 
+// /profile/me returns the raw UserProfile document; normalize to the same
+// shape OTP verification returns.
+function profileToUser(p: any): SessionUser {
+  return {
+    id: String(p.accountId ?? p._id ?? ""),
+    fullName: p.fullName ?? p.name ?? null,
+    wrId: p.wrId ?? null,
+    memberId: p.wrId ?? p.memberId ?? null,
+    phoneNumber: p.phone ?? null,
+    email: p.email ?? null,
+    dateOfBirth: p.dateOfBirth ?? p.dob ?? null,
+    bloodType: p.bloodType ?? null,
+    genotype: p.genotype ?? null,
+  }
+}
+
 const WelliContext = createContext<WelliContextType | undefined>(undefined)
 
 export function WelliProvider({ children }: { children: React.ReactNode }) {
   const [isAuthReady, setIsAuthReady] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [user, setUser] = useState<SessionUser | null>(null)
   const [setupFlow, setSetupFlow] = useState(false)
   const [recordAdded, setRecordAdded] = useState(false)
   const [careStage, setCareStage] = useState<CareStage>("scheduled")
@@ -52,14 +73,45 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
   const [isOffline, setIsOffline] = useState(false)
   const [emergencyProfile, setEmergencyProfile] = useState<EmergencyOfflineProfile | null>(null)
 
-  // Resolve the stored "has this person finished onboarding" flag once on
-  // mount (SecureStore/localStorage is async, unlike the old synchronous
-  // window.localStorage read this replaced).
+  // Resolve the stored session once on mount. A person counts as signed in
+  // only with BOTH a token and the finished-onboarding flag, so quitting
+  // mid-signup lands back on the welcome screen instead of an empty home.
   useEffect(() => {
-    storage.getItem(SETUP_COMPLETE_KEY).then((value) => {
-      setIsAuthenticated(value === "true")
+    let cancelled = false
+    ;(async () => {
+      const [token, setupDone] = await Promise.all([
+        storage.getItem(TOKEN_KEY),
+        storage.getItem(SETUP_COMPLETE_KEY),
+      ])
+      if (cancelled) return
+      const signedIn = Boolean(token) && setupDone === "true"
+      setIsAuthenticated(signedIn)
       setIsAuthReady(true)
+      if (signedIn) {
+        // Best effort: fill in the profile without blocking the first paint.
+        fetchProfile()
+          .then((profile) => {
+            if (!cancelled && profile) setUser(profileToUser(profile))
+          })
+          .catch(() => {})
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // An authenticated request that comes back 401 means the token expired or
+  // was revoked: drop the session and send the person to sign in.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      storage.removeItem(TOKEN_KEY)
+      storage.removeItem(SETUP_COMPLETE_KEY)
+      setUser(null)
+      setIsAuthenticated(false)
+      router.replace("/sign-in")
     })
+    return () => setUnauthorizedHandler(null)
   }, [])
 
   // Initialize offline and emergency caching
@@ -108,6 +160,12 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
     router.replace(target === "records" ? "/(tabs)/records" : "/(tabs)/home")
   }
 
+  const establishSession = async (session: AuthSession) => {
+    await storage.setItem(TOKEN_KEY, session.token)
+    setUser(session.user)
+  }
+
+  // Existing account, code verified: mark setup done and enter the tabs.
   const signIn = () => {
     hapticFeedback.success()
     storage.setItem(SETUP_COMPLETE_KEY, "true")
@@ -116,22 +174,13 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
     router.replace("/(tabs)/home")
   }
 
-  const signInWithBiometrics = async (): Promise<boolean> => {
-    hapticFeedback.medium()
-    const res = await authenticateWithBiometrics("Verify Face ID to unlock WelliRecord")
-    if (res.success) {
-      signIn()
-      return true
-    }
-    hapticFeedback.error()
-    return false
-  }
-
   const signOut = () => {
     hapticFeedback.light()
-    // Clear the persisted flag too, otherwise the next cold start reads
-    // "true" and drops the person straight back into the tabs.
+    // Clear the persisted session too, otherwise the next cold start reads
+    // it back and drops the person straight into the tabs.
+    storage.removeItem(TOKEN_KEY)
     storage.removeItem(SETUP_COMPLETE_KEY)
+    setUser(null)
     setIsAuthenticated(false)
     router.replace("/sign-in")
   }
@@ -181,6 +230,7 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
       value={{
         isAuthReady,
         isAuthenticated,
+        user,
         setupFlow,
         recordAdded,
         careStage,
@@ -193,8 +243,8 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
         addRecord,
         startAccountCreation,
         completeOnboarding,
+        establishSession,
         signIn,
-        signInWithBiometrics,
         signOut,
         confirmBooking,
         confirmCheckIn,

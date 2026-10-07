@@ -11,10 +11,44 @@ import {
   ScreenStack,
 } from "../components/common";
 import { icons } from "../constants/icons";
+import { sendOtp } from "../services/authService";
 
 export default function CreateAccountScreen() {
   const [email, setEmail] = useState(false);
   const [terms, setTerms] = useState(true);
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [emailAddress, setEmailAddress] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const contactValue = (email ? emailAddress : phone).trim();
+  const canContinue =
+    terms && fullName.trim().length > 1 && contactValue.length > 4 && !sending;
+
+  const handleContinue = async () => {
+    setSending(true);
+    setError(null);
+    try {
+      await sendOtp(
+        email ? { email: contactValue.toLowerCase() } : { phone: contactValue },
+        "signup",
+        fullName.trim()
+      );
+      router.push({
+        pathname: "/verify-phone",
+        params: {
+          contact: contactValue,
+          mode: "signup",
+          fullName: fullName.trim(),
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send the code.");
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-white">
@@ -34,14 +68,16 @@ export default function CreateAccountScreen() {
           </View>
 
           <LabeledInput
-            defaultValue="Adaeze Okafor"
+            autoCapitalize="words"
             helper="Use the name you use with your healthcare provider."
             label="Full name"
+            onChangeText={setFullName}
+            value={fullName}
           />
 
           <Card className="gap-4">
             <Choice
-              detail="Selected contact method"
+              detail="Receive a code by SMS"
               icon={icons.smartphone}
               onPress={() => setEmail(false)}
               selected={!email}
@@ -50,10 +86,22 @@ export default function CreateAccountScreen() {
             {!email && (
               <LabeledInput
                 className="pl-[34px]"
-                defaultValue="0800 000 0000"
-                helper="Fictional demo number, not a real credential."
                 keyboardType="phone-pad"
                 label="Nigeria (+234) · Phone"
+                onChangeText={setPhone}
+                placeholder="0803 000 0000"
+                value={phone}
+              />
+            )}
+            {email && (
+              <LabeledInput
+                autoCapitalize="none"
+                className="pl-[34px]"
+                keyboardType="email-address"
+                label="Email address"
+                onChangeText={setEmailAddress}
+                placeholder="you@example.com"
+                value={emailAddress}
               />
             )}
             <Choice
@@ -81,11 +129,9 @@ export default function CreateAccountScreen() {
             </Text>
           </Guidance>
 
-          <PrimaryButton
-            disabled={!terms}
-            onPress={terms ? () => router.push("/verify-phone") : undefined}
-          >
-            Continue to verify contact
+          {error && <Text className="text-xs text-[#af4540]">{error}</Text>}
+          <PrimaryButton disabled={!canContinue} onPress={handleContinue}>
+            {sending ? "Sending code..." : "Continue to verify contact"}
           </PrimaryButton>
         </ScreenStack>
       </ScrollView>

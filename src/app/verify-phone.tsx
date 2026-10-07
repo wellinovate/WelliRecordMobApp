@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { View, Text, ScrollView, TextInput } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Header } from "../components/navigation/Header";
 import {
   Guidance,
@@ -10,26 +10,84 @@ import {
   SecondaryButton,
 } from "../components/common";
 import { icons } from "../constants/icons";
+import { useWelli } from "../state/WelliContext";
+import {
+  contactFromInput,
+  sendOtp,
+  verifyOtp,
+  type AuthMode,
+} from "../services/authService";
 
 export default function VerifyPhoneScreen() {
+  const params = useLocalSearchParams<{
+    contact?: string;
+    mode?: string;
+    fullName?: string;
+  }>();
+  const contactText = params.contact ?? "";
+  const mode: AuthMode = params.mode === "login" ? "login" : "signup";
+  const { establishSession, signIn } = useWelli();
   const [code, setCode] = useState(["", "", "", "", "", ""]);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const complete = code.every(Boolean);
   const inputs = useRef<Array<TextInput | null>>([]);
+  const isEmail = contactText.includes("@");
+
+  const handleVerify = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const session = await verifyOtp(
+        contactFromInput(contactText),
+        code.join(""),
+        mode,
+        params.fullName
+      );
+      await establishSession(session);
+      if (mode === "login") {
+        signIn();
+      } else {
+        router.push("/onboarding-id");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not verify the code.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await sendOtp(contactFromInput(contactText), mode, params.fullName);
+      setCode(["", "", "", "", "", ""]);
+      inputs.current[0]?.focus();
+      setNotice("New code sent. The previous one no longer works.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resend the code.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-white">
-      <Header canGoBack title="Verify your phone" />
+      <Header canGoBack title="Verify your contact" />
       <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" className="flex-1" contentContainerClassName="px-[22px] pb-10 pt-5">
         <ScreenStack>
           <View>
             <Text className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#53657c]">
-              NEW ACCOUNT · STEP 2 OF 4
+              {mode === "login" ? "SIGN IN · VERIFY" : "NEW ACCOUNT · STEP 2 OF 4"}
             </Text>
             <Text className="mt-2 text-2xl font-bold text-[#031f50]">
-              Verify your phone
+              Verify your {isEmail ? "email" : "phone"}
             </Text>
             <Text className="mt-2 text-xs leading-[1.45] text-[#53657c]">
-              Enter the 6-digit code sent to your demo contact.
+              Enter the 6-digit code we sent.
             </Text>
           </View>
 
@@ -41,7 +99,7 @@ export default function VerifyPhoneScreen() {
               Check your messages
             </Text>
             <Text className="mt-3 text-sm text-[#53657c]">
-              Demo destination · +234 800 000 0000
+              {contactText}
             </Text>
           </View>
 
@@ -73,23 +131,24 @@ export default function VerifyPhoneScreen() {
               ))}
             </View>
             <Text className="mt-3 text-sm leading-[1.45] text-[#53657c]">
-              Code expires 10 minutes after it is sent. Resending replaces
-              the previous code.
+              Code expires after a few minutes. Resending replaces the previous
+              code.
             </Text>
           </View>
 
-          <PrimaryButton
-            disabled={!complete}
-            onPress={() => router.push("/onboarding-id")}
-          >
-            Verify contact
+          {error && <Text className="text-xs text-[#af4540]">{error}</Text>}
+          {notice && <Text className="text-xs text-[#24518c]">{notice}</Text>}
+          <PrimaryButton disabled={!complete || busy} onPress={handleVerify}>
+            {busy ? "Please wait..." : "Verify contact"}
           </PrimaryButton>
-          <SecondaryButton
-            onPress={() => setCode(["4", "8", "2", "1", "0", "9"])}
-          >
-            Resend code (Fill Demo)
+          <SecondaryButton disabled={busy} onPress={handleResend}>
+            Resend code
           </SecondaryButton>
-          <SecondaryButton onPress={() => router.push("/create-account")}>
+          <SecondaryButton
+            onPress={() =>
+              router.replace(mode === "login" ? "/sign-in" : "/create-account")
+            }
+          >
             Change phone or use email
           </SecondaryButton>
 
