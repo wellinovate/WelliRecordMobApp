@@ -1,75 +1,77 @@
 /**
  * Universal Haptic Feedback Utility for WelliRecord
- * Provides tactile physical feedback on native iOS / Android and mobile web browsers.
+ * Native iOS/Android use expo-haptics (real taptic engine feedback); web
+ * falls back to the Vibration API where the browser supports it.
  */
+import { Platform } from "react-native"
+import * as Haptics from "expo-haptics"
+
+const isNative = Platform.OS !== "web"
+
+function webVibrate(pattern: number | number[]) {
+  try {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate?.(pattern)
+    }
+  } catch {
+    // safe fallback
+  }
+}
+
 export const hapticFeedback = {
   light: () => {
-    try {
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate?.(10)
-      }
-    } catch {
-      // safe fallback
+    if (isNative) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    } else {
+      webVibrate(10)
     }
   },
 
   medium: () => {
-    try {
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate?.(25)
-      }
-    } catch {
-      // safe fallback
+    if (isNative) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
+    } else {
+      webVibrate(25)
     }
   },
 
   heavy: () => {
-    try {
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate?.(45)
-      }
-    } catch {
-      // safe fallback
+    if (isNative) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {})
+    } else {
+      webVibrate(45)
     }
   },
 
   selection: () => {
-    try {
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate?.(8)
-      }
-    } catch {
-      // safe fallback
+    if (isNative) {
+      Haptics.selectionAsync().catch(() => {})
+    } else {
+      webVibrate(8)
     }
   },
 
   success: () => {
-    try {
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate?.([15, 30, 20])
-      }
-    } catch {
-      // safe fallback
+    if (isNative) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+    } else {
+      webVibrate([15, 30, 20])
     }
   },
 
   warning: () => {
-    try {
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate?.(35)
-      }
-    } catch {
-      // safe fallback
+    if (isNative) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {})
+    } else {
+      webVibrate(35)
     }
   },
 
   error: () => {
-    try {
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate?.([40, 30, 40])
-      }
-    } catch {
-      // safe fallback
+    if (isNative) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {})
+    } else {
+      webVibrate([40, 30, 40])
     }
   },
 }

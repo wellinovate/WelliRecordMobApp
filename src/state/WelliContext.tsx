@@ -1,33 +1,31 @@
 import React, { createContext, useContext, useEffect, useState } from "react"
-import { CareStage, PendingConsent, Screen, TabId } from "../types/navigation"
+import { router } from "expo-router"
+import { CareStage, PendingConsent } from "../types/navigation"
 import { hapticFeedback } from "../utils/haptics"
+import { storage } from "../utils/storage"
 import { offlineSyncService, EmergencyOfflineProfile } from "../services/offlineSyncService"
 import { authenticateWithBiometrics } from "../utils/biometrics"
-import { recordsService } from "../services/recordsService"
+
+const SETUP_COMPLETE_KEY = "wellirecord-setup-complete"
 
 interface WelliContextType {
-  screen: Screen
-  screenHistory: Screen[]
+  // Auth/onboarding gate. isAuthReady flips true once the stored flag has
+  // been read (SecureStore/localStorage is async) — the root route waits
+  // for this before deciding whether to show the auth stack or the tabs.
+  isAuthReady: boolean
+  isAuthenticated: boolean
   setupFlow: boolean
   recordAdded: boolean
   careStage: CareStage
   activeConsent: boolean
   pendingConsent: PendingConsent
   emergencyActive: boolean
-  activeSection: TabId
-  showNavigation: boolean
-  canGoBack: boolean
-  deviceMode: "iphone" | "pixel" | "responsive"
   isOffline: boolean
   emergencyProfile: EmergencyOfflineProfile | null
-  setDeviceMode: (mode: "iphone" | "pixel" | "responsive") => void
   toggleOfflineMode: () => void
-  go: (next: Screen) => void
-  goBack: () => void
-  openSection: (next: TabId) => void
   addRecord: () => void
   startAccountCreation: () => void
-  completeOnboarding: (next: Screen) => void
+  completeOnboarding: (target?: "home" | "records") => void
   signIn: () => void
   signInWithBiometrics: () => Promise<boolean>
   signOut: () => void
@@ -40,69 +38,27 @@ interface WelliContextType {
 
 const WelliContext = createContext<WelliContextType | undefined>(undefined)
 
-const entryScreens: Screen[] = [
-  "welcome",
-  "signIn",
-  "createAccount",
-  "verifyPhone",
-  "onboardingId",
-  "onboardingRecord",
-  "recoverAccount",
-  "verifyRecovery",
-  "recovered",
-]
-
-const healthScreens: Screen[] = [
-  "records",
-  "timeline",
-  "reports",
-  "result",
-  "medications",
-  "emptyVault",
-  "offline",
-  "uploadFailed",
-  "labsLoading",
-  "recordChat",
-  "uploadReview",
-  "healthPassport",
-  "recordAdded",
-]
-
-const careScreens: Screen[] = [
-  "careDiscovery",
-  "bookingTime",
-  "bookingReview",
-  "bookingConfirmed",
-  "visitPrep",
-  "checkIn",
-  "checkedIn",
-  "careJourney",
-]
-
-const shareScreens: Screen[] = [
-  "consentExpanded",
-  "revoke",
-  "shared",
-  "recordActivity",
-]
-
 export function WelliProvider({ children }: { children: React.ReactNode }) {
-  const [screen, setScreen] = useState<Screen>(() => {
-    if (typeof window === "undefined") return "welcome"
-    return window.localStorage.getItem("wellirecord-setup-complete") === "true"
-      ? "home"
-      : "welcome"
-  })
-  const [screenHistory, setScreenHistory] = useState<Screen[]>([])
+  const [isAuthReady, setIsAuthReady] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [setupFlow, setSetupFlow] = useState(false)
   const [recordAdded, setRecordAdded] = useState(false)
   const [careStage, setCareStage] = useState<CareStage>("scheduled")
   const [activeConsent, setActiveConsent] = useState(true)
   const [pendingConsent, setPendingConsent] = useState<PendingConsent>("pending")
   const [emergencyActive, setEmergencyActive] = useState(false)
-  const [deviceMode, setDeviceMode] = useState<"iphone" | "pixel" | "responsive">("iphone")
   const [isOffline, setIsOffline] = useState(false)
   const [emergencyProfile, setEmergencyProfile] = useState<EmergencyOfflineProfile | null>(null)
+
+  // Resolve the stored "has this person finished onboarding" flag once on
+  // mount (SecureStore/localStorage is async, unlike the old synchronous
+  // window.localStorage read this replaced).
+  useEffect(() => {
+    storage.getItem(SETUP_COMPLETE_KEY).then((value) => {
+      setIsAuthenticated(value === "true")
+      setIsAuthReady(true)
+    })
+  }, [])
 
   // Initialize offline and emergency caching
   useEffect(() => {
@@ -113,100 +69,48 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe()
   }, [])
 
-  const mainTabs: TabId[] = ["home", "records", "careDiscovery", "consentExpanded", "profile"]
-  const isMainTab = mainTabs.includes(screen as TabId)
-  const showNavigation = !entryScreens.includes(screen)
-
-  const activeSection: TabId =
-    screen === "home"
-      ? "home"
-      : healthScreens.includes(screen)
-        ? "records"
-        : careScreens.includes(screen)
-          ? "careDiscovery"
-          : shareScreens.includes(screen)
-            ? "consentExpanded"
-            : "profile"
-
   const toggleOfflineMode = () => {
     const next = !isOffline
     setIsOffline(next)
     offlineSyncService.setSimulatedOffline(next)
     hapticFeedback.warning()
     if (next) {
-      go("offline")
-    }
-  }
-
-  const go = (next: Screen) => {
-    if (next === screen) return
-    hapticFeedback.selection()
-    setScreenHistory((prev) => [...prev, screen])
-    setScreen(next)
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    }
-  }
-
-  const goBack = () => {
-    hapticFeedback.light()
-    setScreenHistory((prev) => {
-      const last = prev.at(-1)
-      if (!last) return prev
-      setScreen(last)
-      if (typeof window !== "undefined") {
-        window.scrollTo({ top: 0, behavior: "smooth" })
-      }
-      return prev.slice(0, -1)
-    })
-  }
-
-  const openSection = (next: TabId) => {
-    hapticFeedback.selection()
-    setScreenHistory([])
-    setScreen(next as Screen)
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" })
+      router.push("/offline")
     }
   }
 
   const addRecord = () => {
     hapticFeedback.success()
     setRecordAdded(true)
-    if (setupFlow && typeof window !== "undefined") {
-      window.localStorage.setItem("wellirecord-setup-complete", "true")
+    if (setupFlow) {
+      storage.setItem(SETUP_COMPLETE_KEY, "true")
       setSetupFlow(false)
+      setIsAuthenticated(true)
     }
-    go("recordAdded")
+    router.push("/record-added")
   }
 
   const startAccountCreation = () => {
     hapticFeedback.light()
     setSetupFlow(true)
-    go("createAccount")
+    router.push("/create-account")
   }
 
-  const completeOnboarding = (next: Screen) => {
+  // Called once onboarding finishes (after onboarding-record). Marks setup
+  // complete and drops the whole auth stack for the tabs.
+  const completeOnboarding = (target: "home" | "records" = "home") => {
     hapticFeedback.success()
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("wellirecord-setup-complete", "true")
-    }
+    storage.setItem(SETUP_COMPLETE_KEY, "true")
     setSetupFlow(false)
-    setScreenHistory([])
-    setScreen(next)
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    }
+    setIsAuthenticated(true)
+    router.replace(target === "records" ? "/(tabs)/records" : "/(tabs)/home")
   }
 
   const signIn = () => {
     hapticFeedback.success()
     setSetupFlow(false)
-    setScreenHistory([])
-    setScreen("home")
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    }
+    setIsAuthenticated(true)
+    router.replace("/(tabs)/home")
   }
 
   const signInWithBiometrics = async (): Promise<boolean> => {
@@ -222,65 +126,54 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = () => {
     hapticFeedback.light()
-    setScreenHistory([])
-    setScreen("signIn")
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    }
+    setIsAuthenticated(false)
+    router.replace("/sign-in")
   }
 
   const confirmBooking = () => {
     hapticFeedback.success()
     setCareStage("booked")
-    go("bookingConfirmed")
+    router.push("/booking-confirmed")
   }
 
   const confirmCheckIn = () => {
     hapticFeedback.success()
     setCareStage("checkedIn")
-    go("checkedIn")
+    router.push("/checked-in")
   }
 
   const confirmRevocation = () => {
     hapticFeedback.warning()
     setActiveConsent(false)
-    go("consentExpanded")
+    router.push("/(tabs)/consent-expanded")
   }
 
   const activateEmergency = () => {
     hapticFeedback.heavy()
     setEmergencyActive(true)
-    go("emergencyInfo")
+    router.push("/emergency-info")
   }
 
   const endEmergency = () => {
     hapticFeedback.medium()
     setEmergencyActive(false)
-    go("emergencyQr")
+    router.push("/emergency-qr")
   }
 
   return (
     <WelliContext.Provider
       value={{
-        screen,
-        screenHistory,
+        isAuthReady,
+        isAuthenticated,
         setupFlow,
         recordAdded,
         careStage,
         activeConsent,
         pendingConsent,
         emergencyActive,
-        activeSection,
-        showNavigation,
-        canGoBack: !isMainTab && screenHistory.length > 0,
-        deviceMode,
         isOffline,
         emergencyProfile,
-        setDeviceMode,
         toggleOfflineMode,
-        go,
-        goBack,
-        openSection,
         addRecord,
         startAccountCreation,
         completeOnboarding,

@@ -1,85 +1,150 @@
-import React from "react"
-import { icons } from "../../constants/icons"
+import React from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  Image,
+  TextInput,
+  type ImageSourcePropType,
+} from "react-native";
+import type { SvgProps } from "react-native-svg";
+import { icons } from "../../constants/icons";
+
+// Figma icons come in two shapes after metro.config.js's svg-transformer
+// wiring: every *.svg import is a react-native-svg component, the two *.png
+// entries (logo, hospitalPhoto) are ordinary RN image sources.
+type IconSource = React.ComponentType<SvgProps> | ImageSourcePropType;
+
+// Vertical spacing wrapper every screen uses for its body content — mirrors
+// the original web build's `.stack` CSS class (grid, 20px gaps).
+export function ScreenStack({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <View className={`gap-5 ${className}`}>{children}</View>;
+}
+
+// Shared eyebrow/title/copy header used at the top of most onboarding and
+// detail screens.
+export function ScreenIntroHeader({
+  eyebrow,
+  title,
+  copy,
+}: {
+  eyebrow: string;
+  title: string;
+  copy: string;
+}) {
+  return (
+    <View>
+      <Text className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#53657c]">
+        {eyebrow}
+      </Text>
+      <Text className="mt-2 text-2xl font-bold text-[#031f50]">{title}</Text>
+      <Text className="mt-2 text-xs leading-[1.45] text-[#53657c]">
+        {copy}
+      </Text>
+    </View>
+  );
+}
+
+export function LabeledInput({
+  label,
+  helper,
+  className = "",
+  ...inputProps
+}: {
+  label: string;
+  helper?: string;
+  className?: string;
+} & React.ComponentProps<typeof TextInput>) {
+  return (
+    <View className={className}>
+      <Text className="text-sm font-semibold text-[#031f50]">{label}</Text>
+      <TextInput
+        className="mt-2 h-12 w-full rounded-xl border border-[#dae2ee] bg-white px-3 text-sm text-[#031f50]"
+        placeholderTextColor="#95a3b5"
+        {...inputProps}
+      />
+      {helper && (
+        <Text className="mt-2 text-xs text-[#53657c]">{helper}</Text>
+      )}
+    </View>
+  );
+}
 
 export function Icon({
   src,
   size = 20,
   className = "",
 }: {
-  src: string
-  size?: number
-  className?: string
+  src: IconSource;
+  size?: number;
+  className?: string;
 }) {
+  if (typeof src === "function") {
+    const SvgIcon = src;
+    return <SvgIcon className={className} height={size} width={size} />;
+  }
   return (
-    <img
-      alt=""
-      className={`shrink-0 ${className}`}
-      height={size}
-      src={src}
-      width={size}
+    <Image
+      className={className}
+      source={src}
+      style={{ width: size, height: size }}
     />
-  )
+  );
 }
 
 export function Badge({
   children,
   tone = "blue",
 }: {
-  children: React.ReactNode
-  tone?: "blue" | "red" | "amber"
+  children: React.ReactNode;
+  tone?: "blue" | "red" | "amber";
 }) {
   const color =
     tone === "red"
       ? "bg-[#faedea] text-[#af4540]"
       : tone === "amber"
         ? "bg-[#fbf2e3] text-[#936020]"
-        : "bg-[#edf2fa] text-[#031f50]"
+        : "bg-[#edf2fa] text-[#031f50]";
   return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${color}`}
+    <View
+      className={`inline-flex rounded-full px-2.5 py-1 ${color}`}
     >
-      {children}
-    </span>
-  )
+      <Text className={`text-[11px] font-semibold ${color}`}>{children}</Text>
+    </View>
+  );
 }
 
 export function Card({
   children,
   className = "",
-  onClick,
+  onPress,
 }: {
-  children: React.ReactNode
-  className?: string
-  onClick?: () => void
+  children: React.ReactNode;
+  className?: string;
+  onPress?: () => void;
 }) {
-  const backgroundClass = className.includes("bg-") ? "" : "bg-white"
+  const backgroundClass = className.includes("bg-") ? "" : "bg-white";
   const borderClass = className.includes("border-[")
     ? ""
-    : "border-[#dae2ee]"
+    : "border-[#dae2ee]";
+  const Container = onPress ? Pressable : View;
   return (
-    <div
-      className={`w-full rounded-[20px] border p-[18px] text-left transition-all ${backgroundClass} ${borderClass} ${className} ${
-        onClick
-          ? "cursor-pointer hover:border-[#b8c9e0] active:scale-[0.99]"
-          : ""
+    <Container
+      accessibilityRole={onPress ? "button" : undefined}
+      className={`w-full rounded-[20px] border p-[18px] ${backgroundClass} ${borderClass} ${className} ${
+        onPress ? "active:opacity-80" : ""
       }`}
-      onClick={onClick}
-      onKeyDown={
-        onClick
-          ? (event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault()
-                onClick()
-              }
-            }
-          : undefined
-      }
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
+      onPress={onPress}
     >
       {children}
-    </div>
-  )
+    </Container>
+  );
 }
 
 export function SectionTitle({
@@ -87,56 +152,54 @@ export function SectionTitle({
   action,
   onAction,
 }: {
-  children: React.ReactNode
-  action?: string
-  onAction?: () => void
+  children: React.ReactNode;
+  action?: string;
+  onAction?: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between">
-      <h2 className="text-[17px] font-bold text-[#031f50]">{children}</h2>
+    <View className="flex-row items-center justify-between">
+      <Text className="text-[17px] font-bold text-[#031f50]">{children}</Text>
       {action && (
-        <button
-          className="text-xs font-semibold text-[#24518c] transition-opacity hover:opacity-80"
-          onClick={onAction}
-        >
-          {action}
-        </button>
+        <Pressable accessibilityRole="button" onPress={onAction}>
+          <Text className="text-xs font-semibold text-[#24518c]">
+            {action}
+          </Text>
+        </Pressable>
       )}
-    </div>
-  )
+    </View>
+  );
 }
 
 export function Row({
   icon,
   title,
   detail,
-  onClick,
+  onPress,
 }: {
-  icon: string
-  title: string
-  detail: string
-  onClick?: () => void
+  icon: IconSource;
+  title: string;
+  detail: string;
+  onPress?: () => void;
 }) {
-  const Tag = onClick ? "button" : "div"
+  const Container = onPress ? Pressable : View;
   return (
-    <Tag
-      className="flex w-full items-center gap-3 text-left transition-opacity hover:opacity-90 active:opacity-75"
-      onClick={onClick}
+    <Container
+      accessibilityRole={onPress ? "button" : undefined}
+      className="w-full flex-row items-center gap-3 active:opacity-75"
+      onPress={onPress}
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#edf2fa]">
+      <View className="size-10 shrink-0 items-center justify-center rounded-xl bg-[#edf2fa]">
         <Icon size={20} src={icon} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-[#031f50]">
-          {title}
-        </span>
-        <span className="mt-0.5 block text-xs leading-[1.45] text-[#53657c]">
+      </View>
+      <View className="min-w-0 flex-1">
+        <Text className="text-sm font-semibold text-[#031f50]">{title}</Text>
+        <Text className="mt-0.5 text-xs leading-[1.45] text-[#53657c]">
           {detail}
-        </span>
-      </span>
-      {onClick && <Icon size={16} src={icons.chevron} />}
-    </Tag>
-  )
+        </Text>
+      </View>
+      {onPress && <Icon size={16} src={icons.chevron} />}
+    </Container>
+  );
 }
 
 export function Guidance({
@@ -144,71 +207,75 @@ export function Guidance({
   children,
   tone = "blue",
 }: {
-  title: string
-  children: React.ReactNode
-  tone?: "blue" | "amber"
+  title: string;
+  children: React.ReactNode;
+  tone?: "blue" | "amber";
 }) {
   return (
-    <div
-      className={`flex gap-2.5 rounded-[14px] p-3.5 text-[13px] leading-[1.45] ${
-        tone === "amber"
-          ? "bg-[#fbf2e3] text-[#936020]"
-          : "bg-[#edf2fa] text-[#173b71]"
+    <View
+      className={`flex-row gap-2.5 rounded-[14px] p-3.5 ${
+        tone === "amber" ? "bg-[#fbf2e3]" : "bg-[#edf2fa]"
       }`}
     >
       <Icon size={19} src={tone === "amber" ? icons.alert : icons.shield} />
-      <div>
-        <p className="font-semibold">{title}</p>
-        <div className="mt-1">{children}</div>
-      </div>
-    </div>
-  )
+      <View className="shrink">
+        <Text
+          className={`text-[13px] font-semibold ${
+            tone === "amber" ? "text-[#936020]" : "text-[#173b71]"
+          }`}
+        >
+          {title}
+        </Text>
+        <View className="mt-1">{children}</View>
+      </View>
+    </View>
+  );
 }
 
 export function PrimaryButton({
   children,
-  onClick,
+  onPress,
   danger = false,
   disabled = false,
 }: {
-  children: React.ReactNode
-  onClick?: () => void
-  danger?: boolean
-  disabled?: boolean
+  children: React.ReactNode;
+  onPress?: () => void;
+  danger?: boolean;
+  disabled?: boolean;
 }) {
   return (
-    <button
-      className={`min-h-[50px] w-full rounded-[14px] px-4 text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-50 ${
-        danger
-          ? "bg-[#af4540] hover:bg-[#973a36]"
-          : "bg-[#031f50] hover:bg-[#072a6b]"
+    <Pressable
+      accessibilityRole="button"
+      className={`min-h-[50px] w-full items-center justify-center rounded-[14px] px-4 active:opacity-80 disabled:opacity-50 ${
+        danger ? "bg-[#af4540]" : "bg-[#031f50]"
       }`}
       disabled={disabled}
-      onClick={onClick}
+      onPress={onPress}
     >
-      {children}
-    </button>
-  )
+      <Text className="text-sm font-semibold text-white">{children}</Text>
+    </Pressable>
+  );
 }
 
 export function SecondaryButton({
   children,
-  onClick,
+  onPress,
   disabled = false,
 }: {
-  children: React.ReactNode
-  onClick?: () => void
-  disabled?: boolean
+  children: React.ReactNode;
+  onPress?: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <button
-      className="min-h-[50px] w-full rounded-[14px] border border-[#dae2ee] bg-white px-4 text-sm font-semibold text-[#031f50] transition-all hover:bg-[#f4f7fb] active:scale-[0.98] disabled:opacity-50"
+    <Pressable
+      accessibilityRole="button"
+      className="min-h-[50px] w-full items-center justify-center rounded-[14px] border border-[#dae2ee] bg-white px-4 active:opacity-80 disabled:opacity-50"
       disabled={disabled}
-      onClick={onClick}
+      onPress={onPress}
     >
-      {children}
-    </button>
-  )
+      <Text className="text-sm font-semibold text-[#031f50]">{children}</Text>
+    </Pressable>
+  );
 }
 
 export function ScreenIntro({
@@ -216,19 +283,21 @@ export function ScreenIntro({
   title,
   subtitle,
 }: {
-  icon: string
-  title: string
-  subtitle: string
+  icon: IconSource;
+  title: string;
+  subtitle: string;
 }) {
   return (
-    <div className="text-center">
-      <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-[#edf2fa]">
+    <View className="items-center">
+      <View className="size-14 items-center justify-center rounded-2xl bg-[#edf2fa]">
         <Icon size={28} src={icon} />
-      </span>
-      <h2 className="mt-4 text-xl font-bold text-[#031f50]">{title}</h2>
-      <p className="mt-2 text-xs leading-[1.5] text-[#53657c]">{subtitle}</p>
-    </div>
-  )
+      </View>
+      <Text className="mt-4 text-xl font-bold text-[#031f50]">{title}</Text>
+      <Text className="mt-2 text-center text-xs leading-[1.5] text-[#53657c]">
+        {subtitle}
+      </Text>
+    </View>
+  );
 }
 
 export function Choice({
@@ -236,41 +305,42 @@ export function Choice({
   title,
   detail,
   selected = false,
-  onClick,
+  onPress,
 }: {
-  icon?: string
-  title: string
-  detail: string
-  selected?: boolean
-  onClick?: () => void
+  icon?: IconSource;
+  title: string;
+  detail: string;
+  selected?: boolean;
+  onPress?: () => void;
 }) {
   return (
-    <button
-      className={`flex w-full items-start gap-3.5 rounded-[18px] border p-4 text-left transition-all ${
+    <Pressable
+      accessibilityRole="button"
+      className={`w-full flex-row items-start gap-3.5 rounded-[18px] border p-4 ${
         selected
-          ? "border-[#24518c] bg-[#edf2fa]/60 shadow-sm"
-          : "border-[#dae2ee] bg-white hover:border-[#b8c9e0]"
+          ? "border-[#24518c] bg-[#edf2fa]"
+          : "border-[#dae2ee] bg-white"
       }`}
-      onClick={onClick}
+      onPress={onPress}
     >
       {icon && (
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#edf2fa]">
+        <View className="size-10 shrink-0 items-center justify-center rounded-xl bg-[#edf2fa]">
           <Icon size={20} src={icon} />
-        </span>
+        </View>
       )}
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-[#031f50]">{title}</p>
-        <p className="mt-1 text-xs leading-[1.45] text-[#53657c]">{detail}</p>
-      </div>
-      <div
-        className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${
-          selected
-            ? "border-[#24518c] bg-[#24518c] text-white"
-            : "border-[#b8c9e0]"
+      <View className="min-w-0 flex-1">
+        <Text className="text-sm font-semibold text-[#031f50]">{title}</Text>
+        <Text className="mt-1 text-xs leading-[1.45] text-[#53657c]">
+          {detail}
+        </Text>
+      </View>
+      <View
+        className={`size-5 shrink-0 items-center justify-center rounded-full border ${
+          selected ? "border-[#24518c] bg-[#24518c]" : "border-[#b8c9e0]"
         }`}
       >
         {selected && <Icon size={12} src={icons.check} />}
-      </div>
-    </button>
-  )
+      </View>
+    </Pressable>
+  );
 }

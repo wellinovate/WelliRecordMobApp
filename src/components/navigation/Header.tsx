@@ -1,87 +1,73 @@
-import React from "react"
-import { Icon } from "../common"
-import { icons } from "../../constants/icons"
-import { Screen, screenTitles, TabId } from "../../types/navigation"
+import React from "react";
+import { View, Text, Pressable } from "react-native";
+import { router } from "expo-router";
+import { Icon } from "../common";
+import { icons } from "../../constants/icons";
 
+// Expo Router's Stack renders with headerShown:false (see src/app/_layout.tsx)
+// so every screen embeds this itself, exactly like the original design —
+// full control over the right-side action per screen instead of generic
+// native chrome.
 export function Header({
-  screen,
-  canGoBack,
+  title,
+  canGoBack = false,
   onGoBack,
-  onOpenProfile,
-  onOpenNotifications,
-  onHelp,
+  rightAction = "none",
+  onRightAction,
 }: {
-  screen: Screen
-  canGoBack: boolean
-  onGoBack: () => void
-  onOpenProfile: () => void
-  onOpenNotifications?: () => void
-  onHelp?: () => void
+  title: string;
+  canGoBack?: boolean;
+  onGoBack?: () => void;
+  rightAction?: "help" | "notifications" | "avatar" | "none";
+  onRightAction?: () => void;
 }) {
-  const helpScreens: Screen[] = [
-    "welcome",
-    "signIn",
-    "createAccount",
-    "verifyPhone",
-    "onboardingId",
-    "onboardingRecord",
-    "recoverAccount",
-    "verifyRecovery",
-    "preferences",
-  ]
-  const headerAction = helpScreens.includes(screen)
-    ? "help"
-    : screen === "home"
-      ? "notifications"
-      : "avatar"
-
   return (
-    <header className="app-header sticky top-0 z-20 border-b border-[#e7ecf4] bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-[72px] max-w-4xl items-center gap-3 px-[22px]">
+    <View className="z-20 border-b border-[#e7ecf4] bg-white/95">
+      <View className="h-[72px] flex-row items-center gap-3 px-[22px]">
         {canGoBack && (
-          <button
-            aria-label="Go back"
-            className="flex size-9 items-center justify-center rounded-full bg-[#edf2fa] text-xl font-medium text-[#031f50] transition-transform active:scale-90"
-            onClick={onGoBack}
+          <Pressable
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            className="size-9 items-center justify-center rounded-full bg-[#edf2fa] active:scale-90"
+            onPress={onGoBack ?? (() => router.back())}
           >
-            ‹
-          </button>
+            <Text className="text-xl font-medium text-[#031f50]">‹</Text>
+          </Pressable>
         )}
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-bold tracking-[-0.02em] text-[#24518c]">
-            Welli<span className="text-[#031f50]">Record</span>
-          </p>
-          <h1 className="truncate text-lg font-bold text-[#031f50]">
-            {screenTitles[screen]}
-          </h1>
-        </div>
-        {headerAction === "help" && (
-          <button
-            className="text-sm font-semibold text-[#031f50] transition-opacity hover:opacity-80"
-            onClick={onHelp}
-          >
-            Help
-          </button>
+        <View className="min-w-0 flex-1">
+          <Text className="text-[13px] font-bold tracking-[-0.02em] text-[#24518c]">
+            Welli<Text className="text-[#031f50]">Record</Text>
+          </Text>
+          <Text className="text-lg font-bold text-[#031f50]" numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
+        {rightAction === "help" && (
+          <Pressable accessibilityRole="button" onPress={onRightAction}>
+            <Text className="text-sm font-semibold text-[#031f50]">Help</Text>
+          </Pressable>
         )}
-        {headerAction === "notifications" && (
-          <button
-            aria-label="Notifications"
-            className="flex size-10 items-center justify-center rounded-full bg-[#edf2fa] transition-transform active:scale-95"
-            onClick={onOpenNotifications}
+        {rightAction === "notifications" && (
+          <Pressable
+            accessibilityLabel="Notifications"
+            accessibilityRole="button"
+            className="size-10 items-center justify-center rounded-full bg-[#edf2fa] active:scale-95"
+            onPress={onRightAction}
           >
             <Icon src={icons.bell} />
-          </button>
+          </Pressable>
         )}
-        {headerAction === "avatar" && (
-          <button
-            aria-label="Open profile"
-            className="flex size-10 items-center justify-center rounded-full bg-[#edf2fa] text-xs font-bold text-[#031f50] transition-transform active:scale-95"
-            onClick={onOpenProfile}
+        {rightAction === "avatar" && (
+          <Pressable
+            accessibilityLabel="Open profile"
+            accessibilityRole="button"
+            className="size-10 items-center justify-center rounded-full bg-[#edf2fa] active:scale-95"
+            onPress={onRightAction}
           >
-            AO
-          </button>
+            <Text className="text-xs font-bold text-[#031f50]">AO</Text>
+          </Pressable>
         )}
-      </div>
-    </header>
-  )
+      </View>
+    </View>
+  );
 }

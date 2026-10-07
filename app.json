@@ -45,7 +45,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "static"
+    },
+    "experiments": {
+      "typedRoutes": false
     },
     "extra": {
       "eas": {
@@ -53,6 +57,7 @@
       }
     },
     "plugins": [
+      "expo-router",
       "expo-secure-store",
       "expo-web-browser",
       "expo-image-picker",

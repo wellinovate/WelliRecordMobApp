@@ -8,6 +8,8 @@
  * 4. Automatic background synchronization upon network recovery
  */
 
+import { Platform } from "react-native"
+import NetInfo from "@react-native-community/netinfo"
 import { storage } from "../utils/storage"
 import { CONFIG } from "./config"
 
@@ -39,19 +41,34 @@ class OfflineSyncService {
   private simulatedOffline = false
   private listeners: Array<(isOnline: boolean) => void> = []
 
+  private lastKnownOnline = true
+
   constructor() {
-    if (typeof window !== "undefined") {
-      window.addEventListener("online", () => this.handleNetworkChange(true))
-      window.addEventListener("offline", () => this.handleNetworkChange(false))
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined") {
+        window.addEventListener("online", () => this.handleNetworkChange(true))
+        window.addEventListener("offline", () => this.handleNetworkChange(false))
+      }
+      return
     }
+    // Native: NetInfo is the real connectivity signal (no window/navigator
+    // online events exist off the web).
+    NetInfo.addEventListener((state) => {
+      const online = !!(state.isConnected && state.isInternetReachable !== false)
+      this.lastKnownOnline = online
+      this.handleNetworkChange(online)
+    })
   }
 
   public isOnline(): boolean {
     if (this.simulatedOffline) return false
-    if (typeof navigator !== "undefined" && "onLine" in navigator) {
-      return navigator.onLine
+    if (Platform.OS === "web") {
+      if (typeof navigator !== "undefined" && "onLine" in navigator) {
+        return navigator.onLine
+      }
+      return true
     }
-    return true
+    return this.lastKnownOnline
   }
 
   public setSimulatedOffline(offline: boolean) {
