@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   Alert,
   RefreshControl,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Header } from "../../components/navigation/Header";
 import {
   Badge,
@@ -73,9 +73,13 @@ export default function HomeScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadAppointments();
-  }, [loadAppointments]);
+  // Tabs stay mounted, so refetch whenever home regains focus (for example
+  // after booking or cancelling).
+  useFocusEffect(
+    useCallback(() => {
+      loadAppointments();
+    }, [loadAppointments])
+  );
 
   const firstName = user?.fullName?.trim().split(/\s+/)[0] ?? null;
   const allergies = user?.allergies?.trim();
@@ -195,6 +199,12 @@ export default function HomeScreen() {
                   .filter(Boolean)
                   .join(" · ")}
                 icon={icons.calendar}
+                onPress={() =>
+                  router.push({
+                    pathname: "/booking-confirmed",
+                    params: { id: appointment.id },
+                  })
+                }
                 title={
                   appointment.status === "requested"
                     ? "Appointment requested"

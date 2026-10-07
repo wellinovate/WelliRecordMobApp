@@ -190,7 +190,18 @@ export default function CareDiscoveryScreen() {
                   </View>
                 )}
                 <View className="mt-4">
-                  <PrimaryButton onPress={() => router.push("/booking-time")}>
+                  <PrimaryButton
+                    onPress={() =>
+                      router.push({
+                        pathname: "/booking-time",
+                        params: {
+                          facilityId: provider.id,
+                          facilityName: provider.name,
+                          facilityAddress: provider.address,
+                        },
+                      })
+                    }
+                  >
                     Book an appointment
                   </PrimaryButton>
                 </View>

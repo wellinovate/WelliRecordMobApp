@@ -1,9 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, ScrollView } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Header } from "../components/navigation/Header";
 import {
-  Badge,
   Card,
   Guidance,
   PrimaryButton,
@@ -11,13 +10,55 @@ import {
   ScreenIntroHeader,
   ScreenStack,
   SecondaryButton,
-  SectionTitle,
 } from "../components/common";
 import { icons } from "../constants/icons";
-import { useWelli } from "../state/WelliContext";
+import {
+  createAppointmentRequest,
+  formatAppointmentDate,
+} from "../services/appointmentService";
+import { hapticFeedback } from "../utils/haptics";
 
 export default function BookingReviewScreen() {
-  const { confirmBooking } = useWelli();
+  const p = useLocalSearchParams<{
+    facilityId?: string;
+    facilityName?: string;
+    facilityAddress?: string;
+    date?: string;
+    timeSlot?: string;
+    reason?: string;
+  }>();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ready = !!(p.facilityName && p.date && p.timeSlot);
+
+  const handleConfirm = async () => {
+    if (!ready || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const appointment = await createAppointmentRequest({
+        facilityId: p.facilityId || undefined,
+        facilityName: p.facilityName!,
+        facilityAddress: p.facilityAddress || undefined,
+        date: p.date!,
+        timeSlot: p.timeSlot!,
+        reason: p.reason || undefined,
+      });
+      hapticFeedback.success();
+      router.replace({
+        pathname: "/booking-confirmed",
+        params: { id: appointment.id },
+      });
+    } catch (err) {
+      hapticFeedback.error();
+      setError(
+        err instanceof Error ? err.message : "Could not send the request."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-white">
@@ -28,61 +69,60 @@ export default function BookingReviewScreen() {
       >
         <ScreenStack>
           <ScreenIntroHeader
-            copy="Check your visit and costs before confirming."
+            copy="Check the details before you send the request."
             eyebrow="BOOKING · REVIEW"
-            title="Review your booking"
+            title="Review your request"
           />
-          <Card>
-            <Row
-              detail="Internal medicine · Verified provider"
-              icon={icons.stethoscope}
-              title="Dr Amaka Bello"
-            />
-            <Text className="mt-4 text-sm font-semibold text-[#031f50]">
-              Mon, 5 Oct 2026 · 10:30 AM · 30 min
-            </Text>
-            <Text className="mt-4 text-sm leading-[1.45] text-[#53657c]">
-              Lagoon Hospital, Ikeja{"\n"}
-              3 Obafemi Awolowo Way{"\n"}
-              Reason: hypertension follow-up
-            </Text>
-            <Text className="mt-4 text-xs text-[#53657c]">
-              Time zone: Africa/Lagos
-            </Text>
-          </Card>
-          <SectionTitle>Coverage & registration</SectionTitle>
-          <Card>
-            <Badge>Consultation authorized</Badge>
-            <Text className="mt-4 text-sm font-semibold text-[#031f50]">
-              Reliance HMO · RL-AU-51073
-            </Text>
-            <Text className="mt-3 text-xs leading-[1.45] text-[#53657c]">
-              Member RL-209184 · Active through 31 Dec 2026. Tests may need
-              separate authorization.
-            </Text>
-            <Text className="mt-4 text-sm font-semibold text-[#031f50]">
-              ₦5,000 registration fee
-            </Text>
-            <Text className="mt-2 text-xs text-[#53657c]">
-              Not covered by HMO · Separate bill LG-B051026-073.
-            </Text>
-          </Card>
-          <Guidance title="Booking information only">
+          {!ready ? (
+            <Card>
+              <Text className="text-sm font-semibold text-[#031f50]">
+                Nothing to review
+              </Text>
+              <View className="mt-4">
+                <PrimaryButton
+                  onPress={() => router.replace("/(tabs)/care-discovery")}
+                >
+                  Find care
+                </PrimaryButton>
+              </View>
+            </Card>
+          ) : (
+            <Card>
+              <Row
+                detail={p.facilityAddress || "Participating provider"}
+                icon={icons.stethoscope}
+                title={p.facilityName!}
+              />
+              <Text className="mt-4 text-sm font-semibold text-[#031f50]">
+                {formatAppointmentDate(p.date!)}
+              </Text>
+              <Text className="mt-1 text-sm text-[#031f50]">{p.timeSlot}</Text>
+              {p.reason ? (
+                <Text className="mt-4 text-sm leading-[1.45] text-[#53657c]">
+                  Reason: {p.reason}
+                </Text>
+              ) : null}
+            </Card>
+          )}
+
+          <Guidance title="What the provider receives">
             <Text className="text-[13px] leading-[1.45] text-[#173b71]">
-              Send your name, WelliID, verified contact, selected
-              clinician/time, reason and HMO authorization. No lab reports
-              are included.
+              Your name, WelliID, contact details, the day and time window
+              you chose, and your reason. No health records are included.
             </Text>
           </Guidance>
           <Guidance title="Sharing is a separate choice">
             <Text className="text-[13px] leading-[1.45] text-[#173b71]">
-              Confirming this booking does not grant clinical record access.
+              Sending this request does not give the provider access to your
+              records.
             </Text>
           </Guidance>
-          <PrimaryButton onPress={confirmBooking}>
-            Confirm booking
+
+          {error && <Text className="text-xs text-[#af4540]">{error}</Text>}
+          <PrimaryButton disabled={!ready || submitting} onPress={handleConfirm}>
+            {submitting ? "Sending request..." : "Send request"}
           </PrimaryButton>
-          <SecondaryButton onPress={() => router.push("/booking-time")}>
+          <SecondaryButton disabled={submitting} onPress={() => router.back()}>
             Change visit details
           </SecondaryButton>
         </ScreenStack>
