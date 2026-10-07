@@ -110,6 +110,7 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = () => {
     hapticFeedback.success()
+    storage.setItem(SETUP_COMPLETE_KEY, "true")
     setSetupFlow(false)
     setIsAuthenticated(true)
     router.replace("/(tabs)/home")
@@ -128,6 +129,9 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = () => {
     hapticFeedback.light()
+    // Clear the persisted flag too, otherwise the next cold start reads
+    // "true" and drops the person straight back into the tabs.
+    storage.removeItem(SETUP_COMPLETE_KEY)
     setIsAuthenticated(false)
     router.replace("/sign-in")
   }

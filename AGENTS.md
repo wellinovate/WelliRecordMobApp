@@ -1,41 +1,36 @@
-# figma-make-app
+# WelliRecord mobile app
 
-React + Vite + Tailwind CSS project running inside Figma Make.
+Expo / React Native patient app for WelliRecord. Expo Router for navigation, NativeWind v4 (Tailwind v3) for styling, pnpm for packages. This was converted from a Figma Make web prototype (React + Vite + Tailwind v4); none of that web stack remains.
 
-## Development Server
+## Before touching Expo or React Native APIs
 
-A Vite development server is **already running** on `$PORT` (default 8443). You don't need to start it manually.
+Expo ships breaking changes every SDK release. Read the `expo` major version in `package.json`, then check the matching docs (`https://docs.expo.dev/versions/v<major>.0.0/`) instead of relying on memory.
 
-- Preview URL: The user can access the running app through the preview panel
-- Hot reload: Changes to source files are reflected immediately
+## Commands
 
-## Project Structure
+```bash
+npx expo install <package>   # use instead of pnpm add; resolves SDK-compatible versions
+npx expo start               # dev server
+npx tsc --noEmit             # typecheck
+npx expo export --platform web   # strongest build check available without a device
+```
 
-This is the canonical project structure. Start with task-relevant files below. Only follow imports or inspect other files when required, when a documented path is missing, or when the repository contradicts this guide.
+Run typecheck before declaring a task done.
 
-- `src/main.tsx` - React entrypoint; imports `src/index.css` and mounts `src/App.tsx` into the `#root` element
-- `src/App.tsx` - Primary application component and the usual starting point for UI work
-- `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
-- `index.html` - Vite HTML shell containing the `#root` element and loading `src/main.tsx`
-- `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts
-- `vite.config.ts` - Vite configuration with React, Tailwind CSS v4, and Figma Make plugins plus the `@` alias for `src`
-- `.mise.toml` - Toolchain versions for Node.js and pnpm
+## Structure
 
-## Dependencies
+- `src/app/` — Expo Router routes. One file per screen; `(tabs)/` holds the five tab screens. Keep non-route code out of this folder.
+- `src/components/common/` — shared UI (`Card`, `Row`, `Badge`, `PrimaryButton`, ...). Use `onPress`, never `onClick`.
+- `src/components/navigation/` — `Header` (every screen renders its own) and the custom `BottomTabBar`.
+- `src/state/WelliContext.tsx` — app state and flow actions. Navigation goes through `router` from `expo-router`.
+- `src/services/`, `src/utils/` — storage, haptics, biometrics, media picker, offline sync. Each branches on `Platform.OS` for native vs web.
+- `src/constants/icons.ts` — SVG icons imported as components via `react-native-svg-transformer`.
 
-- Runtime: React 19 and React DOM 19
-- Styling: Tailwind CSS v4 with the `@tailwindcss/vite` plugin
-- Build tooling: Vite 8, TypeScript 5.7, and `@vitejs/plugin-react`
-- Formatting: oxfmt
+## Rules
 
-## Styling
-
-This project uses **Tailwind CSS v4** through the `@tailwindcss/vite` plugin configured in `vite.config.ts`. `src/index.css` imports Tailwind with `@import 'tailwindcss';`. Use Tailwind utility classes directly in JSX and put global CSS or Tailwind v4 theme customization in `src/index.css`. This scaffold does not need a Tailwind config file or PostCSS config.
-
-`src/main.tsx` imports `src/index.css`, so global font wiring belongs in `src/index.css`. Keep CSS `@import` statements first, then add any `@font-face` rules and font-family defaults there.
-
-## Code quality
-
-- Use double quotes for strings containing apostrophes (`"We're here to help"`), or escape them in single-quoted strings. An unescaped apostrophe in a single-quoted string breaks the build.
-- Ensure JSX tags are closed and braces are balanced.
-- Export components as default exports.
+- Use React Native primitives (`View`, `Text`, `Pressable`, `TextInput`, `ScrollView`). No `div`, `span`, `button`, or `input`.
+- Style with NativeWind `className`. Web-only utilities (`inline-flex`, `grid-cols-*`, `hover:`, `space-y-*`) do not work.
+- No `window`, `document`, `localStorage` or `navigator` outside a `Platform.OS === "web"` branch.
+- Tailwind stays on v3 until NativeWind v5 is stable.
+- If `ios/` and `android/` do not exist they are generated. Do not edit them by hand; configure native behavior in `app.json` and config plugins.
+- Expo Go only bundles its own native modules. After adding a library with native code, use a development build.

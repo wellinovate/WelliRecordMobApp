@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon } from "../common";
 import { icons } from "../../constants/icons";
 
@@ -21,8 +22,14 @@ export function Header({
   rightAction?: "help" | "notifications" | "avatar" | "none";
   onRightAction?: () => void;
 }) {
+  // Every screen embeds its own Header (native chrome is off), so this is the
+  // only thing keeping content clear of the notch / status bar.
+  const insets = useSafeAreaInsets();
   return (
-    <View className="z-20 border-b border-[#e7ecf4] bg-white/95">
+    <View
+      className="z-20 border-b border-[#e7ecf4] bg-white/95"
+      style={{ paddingTop: insets.top }}
+    >
       <View className="h-[72px] flex-row items-center gap-3 px-[22px]">
         {canGoBack && (
           <Pressable

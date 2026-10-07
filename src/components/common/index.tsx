@@ -105,17 +105,17 @@ export function Badge({
   children: React.ReactNode;
   tone?: "blue" | "red" | "amber";
 }) {
-  const color =
+  const [bg, text] =
     tone === "red"
-      ? "bg-[#faedea] text-[#af4540]"
+      ? ["bg-[#faedea]", "text-[#af4540]"]
       : tone === "amber"
-        ? "bg-[#fbf2e3] text-[#936020]"
-        : "bg-[#edf2fa] text-[#031f50]";
+        ? ["bg-[#fbf2e3]", "text-[#936020]"]
+        : ["bg-[#edf2fa]", "text-[#031f50]"];
+  // self-start keeps the pill hugging its text inside column parents (the web
+  // build got this from inline-flex, which doesn't exist in React Native).
   return (
-    <View
-      className={`inline-flex rounded-full px-2.5 py-1 ${color}`}
-    >
-      <Text className={`text-[11px] font-semibold ${color}`}>{children}</Text>
+    <View className={`self-start rounded-full px-2.5 py-1 ${bg}`}>
+      <Text className={`text-[11px] font-semibold ${text}`}>{children}</Text>
     </View>
   );
 }
