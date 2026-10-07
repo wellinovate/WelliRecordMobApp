@@ -15,6 +15,7 @@ export interface LabResult {
   resultedAt?: string
   verificationStatus?: string
   notes?: string
+  organizationName?: string | null
   createdAt: string
 }
 

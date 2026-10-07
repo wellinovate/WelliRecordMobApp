@@ -5,6 +5,7 @@ import { hapticFeedback } from "../utils/haptics"
 import { storage } from "../utils/storage"
 import { offlineSyncService, EmergencyOfflineProfile } from "../services/offlineSyncService"
 import { TOKEN_KEY, setUnauthorizedHandler } from "../services/apiClient"
+import { clearRecordsCache } from "../hooks/useRecords"
 import { fetchProfile, type AuthSession, type SessionUser } from "../services/authService"
 
 const SETUP_COMPLETE_KEY = "wellirecord-setup-complete"
@@ -55,6 +56,7 @@ function profileToUser(p: any): SessionUser {
     dateOfBirth: p.dateOfBirth ?? p.dob ?? null,
     bloodType: p.bloodType ?? null,
     genotype: p.genotype ?? null,
+    allergies: typeof p.allergies === "string" ? p.allergies : null,
   }
 }
 
@@ -107,6 +109,7 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
     setUnauthorizedHandler(() => {
       storage.removeItem(TOKEN_KEY)
       storage.removeItem(SETUP_COMPLETE_KEY)
+      clearRecordsCache()
       setUser(null)
       setIsAuthenticated(false)
       router.replace("/sign-in")
@@ -163,6 +166,13 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
   const establishSession = async (session: AuthSession) => {
     await storage.setItem(TOKEN_KEY, session.token)
     setUser(session.user)
+    // The verify response is a trimmed profile; load the full one (allergies
+    // and the rest) in the background.
+    fetchProfile()
+      .then((profile) => {
+        if (profile) setUser(profileToUser(profile))
+      })
+      .catch(() => {})
   }
 
   // Existing account, code verified: mark setup done and enter the tabs.
@@ -180,6 +190,7 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
     // it back and drops the person straight into the tabs.
     storage.removeItem(TOKEN_KEY)
     storage.removeItem(SETUP_COMPLETE_KEY)
+    clearRecordsCache()
     setUser(null)
     setIsAuthenticated(false)
     router.replace("/sign-in")

@@ -1,45 +1,85 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  RefreshControl,
+  ActivityIndicator,
+} from "react-native";
 import { Header } from "../components/navigation/Header";
 import {
   Badge,
   Card,
   Guidance,
   Icon,
-  Row,
   ScreenStack,
-  SectionTitle,
+  SecondaryButton,
 } from "../components/common";
 import { icons } from "../constants/icons";
 import {
-  medicationReminderService,
-  type MedicationItem,
-} from "../services/medicationReminderService";
+  clockLabel,
+  dosageText,
+  fetchMedications,
+  isCurrent,
+  takenToday,
+  toggleTakenToday,
+  type MedicationEntry,
+} from "../services/medicationService";
 import { hapticFeedback } from "../utils/haptics";
 
-const WEEK_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+function shortDate(raw?: string | null): string | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function MedicationsScreen() {
   const [activeTab, setActiveTab] = useState<"current" | "past">("current");
-  const [medications, setMedications] = useState<MedicationItem[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [meds, setMeds] = useState<MedicationEntry[]>([]);
+  const [taken, setTaken] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async (mode: "initial" | "refresh") => {
+    if (mode === "refresh") setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+    try {
+      const [list, log] = await Promise.all([fetchMedications(), takenToday()]);
+      setMeds(list);
+      setTaken(log);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not load medications."
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    medicationReminderService.getMedications().then((meds) => {
-      setMedications(meds);
-      setLoaded(true);
-    });
-  }, []);
+    load("initial");
+  }, [load]);
 
-  const handleToggle = useCallback(async (id: string) => {
+  const current = useMemo(() => meds.filter(isCurrent), [meds]);
+  const past = useMemo(() => meds.filter((m) => !isCurrent(m)), [meds]);
+  const shown = activeTab === "current" ? current : past;
+  const takenCount = current.filter((m) => taken.has(m._id)).length;
+
+  const handleToggle = async (id: string) => {
     hapticFeedback.light();
-    const updated = await medicationReminderService.toggleTaken(id);
-    setMedications(updated);
-  }, []);
-
-  const takenCount = medications.filter((m) => m.takenToday).length;
-  const evening = medications.find((m) => m.time.includes("PM"));
-  const morning = medications.find((m) => m.time.includes("AM"));
+    setTaken(await toggleTakenToday(id));
+  };
 
   return (
     <View className="flex-1 bg-white">
@@ -47,155 +87,187 @@ export default function MedicationsScreen() {
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-[22px] pb-10 pt-5"
+        refreshControl={
+          <RefreshControl
+            onRefresh={() => load("refresh")}
+            refreshing={refreshing}
+          />
+        }
       >
         <ScreenStack>
           <View className="flex-row rounded-[14px] bg-[#edf2fa] p-1">
-            <Pressable
-              accessibilityRole="button"
-              className={`flex-1 rounded-[11px] py-2.5 ${
-                activeTab === "current" ? "bg-white shadow-sm" : ""
-              }`}
-              onPress={() => setActiveTab("current")}
-            >
-              <Text
-                className={`text-center text-xs font-semibold ${
-                  activeTab === "current" ? "text-[#031f50]" : "text-[#53657c]"
+            {(["current", "past"] as const).map((tab) => (
+              <Pressable
+                accessibilityRole="button"
+                className={`flex-1 rounded-[11px] py-2.5 ${
+                  activeTab === tab ? "bg-white shadow-sm" : ""
                 }`}
+                key={tab}
+                onPress={() => setActiveTab(tab)}
               >
-                Current · {medications.length}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              className={`flex-1 rounded-[11px] py-2.5 ${
-                activeTab === "past" ? "bg-white shadow-sm" : ""
-              }`}
-              onPress={() => setActiveTab("past")}
-            >
-              <Text
-                className={`text-center text-xs font-semibold ${
-                  activeTab === "past" ? "text-[#031f50]" : "text-[#53657c]"
-                }`}
-              >
-                Past · 1
-              </Text>
-            </Pressable>
-          </View>
-
-          <Card className="bg-[#edf2fa]">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-[15px] font-semibold text-[#031f50]">
-                This week's routine
-              </Text>
-              <Text className="text-[11px] font-semibold text-[#031f50]">
-                {takenCount} of {medications.length} taken today
-              </Text>
-            </View>
-            <View className="mt-4 flex-row justify-between">
-              {WEEK_DAYS.map((d, i) => (
-                <View className="items-center" key={`${d}-${i}`}>
-                  <View
-                    className={`size-8 items-center justify-center rounded-full ${
-                      i === 4 ? "bg-white shadow-sm" : "bg-[#031f50]"
-                    }`}
-                  >
-                    <Icon size={15} src={i === 4 ? icons.minus : icons.check} />
-                  </View>
-                  <Text className="mt-1 text-[10px] text-[#53657c]">{d}</Text>
-                </View>
-              ))}
-            </View>
-            <Text className="mt-3 text-[11px] text-[#53657c]">
-              Self-reported dose logs, not proof of use.
-            </Text>
-          </Card>
-
-          <SectionTitle>Today</SectionTitle>
-
-          {loaded && evening && (
-            <Card>
-              <View className="flex-row items-center justify-between">
-                <Icon src={icons.pill} />
-                <Badge tone="amber">{evening.time} reminder</Badge>
-              </View>
-              <Text className="mt-4 text-lg font-bold text-[#031f50]">
-                {evening.name} · {evening.dosage}
-              </Text>
-              <Text className="mt-3 text-sm leading-[1.45] text-[#173b71]">
-                {evening.frequency}
-                {"\n"}
-                {evening.instructions}
-              </Text>
-              <Text className="mt-4 text-xs text-[#53657c]">
-                {evening.remainingDays} days remaining
-              </Text>
-              <View className="mt-4 flex-row gap-3">
-                <Pressable
-                  accessibilityRole="button"
-                  className={`h-12 flex-1 items-center justify-center rounded-xl active:scale-[0.98] ${
-                    evening.takenToday ? "bg-[#edf2fa]" : "bg-[#031f50]"
+                <Text
+                  className={`text-center text-xs font-semibold ${
+                    activeTab === tab ? "text-[#031f50]" : "text-[#53657c]"
                   }`}
-                  onPress={() => handleToggle(evening.id)}
                 >
-                  <Text
-                    className={`text-sm font-semibold ${
-                      evening.takenToday ? "text-[#031f50]" : "text-white"
-                    }`}
-                  >
-                    {evening.takenToday ? "Undo taken" : "✓  Taken"}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  className="h-12 flex-1 items-center justify-center rounded-xl border border-[#dae2ee] bg-white active:scale-[0.98]"
-                >
-                  <Text className="text-sm font-semibold text-[#031f50]">
-                    Snooze
-                  </Text>
-                </Pressable>
-              </View>
-              <Pressable accessibilityRole="button" className="mt-3">
-                <Text className="text-xs font-semibold text-[#53657c]">
-                  Mark skipped · Add a reason
+                  {tab === "current" ? "Current" : "Past"} ·{" "}
+                  {tab === "current" ? current.length : past.length}
                 </Text>
               </Pressable>
+            ))}
+          </View>
+
+          {loading && (
+            <View className="items-center py-10">
+              <ActivityIndicator color="#031f50" />
+            </View>
+          )}
+
+          {!loading && error && (
+            <Card>
+              <Text className="text-sm font-semibold text-[#031f50]">
+                Could not load medications
+              </Text>
+              <Text className="mt-2 text-xs leading-[1.45] text-[#53657c]">
+                {error}
+              </Text>
+              <View className="mt-4">
+                <SecondaryButton onPress={() => load("initial")}>
+                  Try again
+                </SecondaryButton>
+              </View>
             </Card>
           )}
 
-          {loaded && morning && (
-            <Card>
+          {!loading && !error && activeTab === "current" && current.length > 0 && (
+            <Card className="bg-[#edf2fa]">
               <View className="flex-row items-center justify-between">
-                <Text className="text-lg font-bold text-[#031f50]">
-                  {morning.name} · {morning.dosage}
+                <Text className="text-[15px] font-semibold text-[#031f50]">
+                  Today
                 </Text>
-                <Badge>{morning.takenToday ? "Taken" : "Pending"}</Badge>
+                <Text className="text-[11px] font-semibold text-[#031f50]">
+                  {takenCount} of {current.length} marked taken
+                </Text>
               </View>
-              <Text className="mt-3 text-sm text-[#173b71]">
-                {morning.frequency}
-                {"\n"}
-                {morning.instructions}
+              <Text className="mt-2 text-[11px] text-[#53657c]">
+                Self-reported on this device, not proof of use.
               </Text>
-              <Text className="mt-4 text-xs text-[#53657c]">
-                Scheduled {morning.time}
-              </Text>
-              <View className="mt-3">
-                <Badge>Verified prescription</Badge>
-              </View>
             </Card>
           )}
+
+          {!loading && !error && shown.length === 0 && (
+            <Card>
+              <Text className="text-sm font-semibold text-[#031f50]">
+                {activeTab === "current"
+                  ? "No current medications"
+                  : "No past medications"}
+              </Text>
+              <Text className="mt-2 text-xs leading-[1.45] text-[#53657c]">
+                Medications your provider or pharmacy records appear here.
+              </Text>
+            </Card>
+          )}
+
+          {!loading &&
+            shown.map((m) => {
+              const dose = dosageText(m);
+              const start = shortDate(m.startDate ?? m.prescribedAt);
+              const end = shortDate(m.endDate);
+              const isTaken = taken.has(m._id);
+              const times = m.scheduleTimes ?? [];
+              const details = [
+                m.form && m.form !== "other" ? cap(m.form) : null,
+                m.route && m.route !== "oral" && m.route !== "other"
+                  ? m.route.toUpperCase()
+                  : null,
+                m.frequency,
+                m.duration,
+              ].filter(Boolean);
+              return (
+                <Card key={m._id}>
+                  <View className="flex-row items-start justify-between gap-3">
+                    <View className="flex-1 flex-row gap-3">
+                      <Icon src={icons.pill} />
+                      <View className="flex-1">
+                        <Text className="text-lg font-bold text-[#031f50]">
+                          {m.medicationName}
+                          {dose ? ` · ${dose}` : ""}
+                        </Text>
+                        {m.genericName && m.genericName !== m.medicationName && (
+                          <Text className="mt-1 text-xs text-[#53657c]">
+                            {m.genericName}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    {m.medicationStatus && m.medicationStatus !== "active" && (
+                      <Badge tone="amber">
+                        {cap(m.medicationStatus.replace("-", " "))}
+                      </Badge>
+                    )}
+                  </View>
+
+                  {details.length > 0 && (
+                    <Text className="mt-3 text-sm leading-[1.45] text-[#173b71]">
+                      {details.join(" · ")}
+                    </Text>
+                  )}
+                  {m.indication && (
+                    <Text className="mt-2 text-xs text-[#53657c]">
+                      For: {m.indication}
+                    </Text>
+                  )}
+                  {(m.organizationName || start || end) && (
+                    <Text className="mt-2 text-xs text-[#53657c]">
+                      {[
+                        m.organizationName ? `Prescribed by ${m.organizationName}` : null,
+                        start ? `From ${start}` : null,
+                        end ? `to ${end}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </Text>
+                  )}
+                  {times.length > 0 && (
+                    <View className="mt-3 flex-row flex-wrap gap-2">
+                      {times.map((t) => (
+                        <Badge key={t}>{clockLabel(t)}</Badge>
+                      ))}
+                    </View>
+                  )}
+                  <View className="mt-3">
+                    <Badge>
+                      {m.source === "patient" ? "Patient Added" : "Verified prescription"}
+                    </Badge>
+                  </View>
+
+                  {activeTab === "current" && (
+                    <Pressable
+                      accessibilityRole="button"
+                      className={`mt-4 h-12 items-center justify-center rounded-xl active:scale-[0.98] ${
+                        isTaken ? "bg-[#edf2fa]" : "bg-[#031f50]"
+                      }`}
+                      onPress={() => handleToggle(m._id)}
+                    >
+                      <Text
+                        className={`text-sm font-semibold ${
+                          isTaken ? "text-[#031f50]" : "text-white"
+                        }`}
+                      >
+                        {isTaken ? "Undo taken today" : "✓  Mark taken today"}
+                      </Text>
+                    </Pressable>
+                  )}
+                </Card>
+              );
+            })}
 
           <Guidance title="Safety information, not prescribing advice" tone="amber">
             <Text className="text-[13px] leading-[1.45] text-[#936020]">
-              Penicillin allergy is on your record. Ask your clinician or
-              pharmacist before changes.
+              Ask your clinician or pharmacist before starting, stopping or
+              changing any medicine.
             </Text>
           </Guidance>
-
-          <Row
-            detail="8:00 AM & 8:00 PM · Notifications enabled"
-            icon={icons.bell}
-            title="Reminder preferences"
-          />
         </ScreenStack>
       </ScrollView>
     </View>

@@ -1,34 +1,111 @@
-import React from "react";
-import { View, Text, ScrollView, Pressable, Alert } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Alert,
+  RefreshControl,
+} from "react-native";
 import { router } from "expo-router";
 import { Header } from "../../components/navigation/Header";
-import { Badge, Card, Icon, Row, ScreenStack, SectionTitle } from "../../components/common";
+import {
+  Badge,
+  Card,
+  Icon,
+  Row,
+  ScreenStack,
+  SectionTitle,
+} from "../../components/common";
 import { icons } from "../../constants/icons";
 import { useWelli } from "../../state/WelliContext";
+import { useRecords } from "../../hooks/useRecords";
+import {
+  fetchAppointments,
+  nextAppointment,
+  type Appointment,
+} from "../../services/appointmentService";
+import { labDate, labValue } from "../../services/labService";
+import {
+  clockLabel,
+  dosageText,
+  isCurrent,
+  nextDose,
+} from "../../services/medicationService";
 
 const quickActions = [
-  [icons.calendar, "Appointments", "/booking-time"],
+  [icons.calendar, "Appointments", "/(tabs)/care-discovery"],
   [icons.send, "Share record", "/(tabs)/consent-expanded"],
-  [icons.scan, "Upload", "/(tabs)/records"],
+  [icons.scan, "Upload", "/upload-review"],
   [icons.lab, "Lab results", "/reports"],
 ] as const;
 
+function greeting(name: string | null): string {
+  const h = new Date().getHours();
+  const part = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+  return name ? `${part}, ${name}` : part;
+}
+
+function appointmentWhen(a: Appointment): string {
+  const d = new Date(a.scheduledFor);
+  const day = d.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  return a.timeSlot ? `${day} · ${a.timeSlot}` : day;
+}
+
 export default function HomeScreen() {
-  const { careStage } = useWelli();
+  const { user } = useWelli();
+  const { labs, medications, loadedAt, refreshing, refresh } = useRecords();
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [apptState, setApptState] = useState<"loading" | "ready" | "error">(
+    "loading"
+  );
+
+  const loadAppointments = useCallback(async () => {
+    try {
+      setAppointment(nextAppointment(await fetchAppointments()));
+      setApptState("ready");
+    } catch {
+      setApptState("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
+
+  const firstName = user?.fullName?.trim().split(/\s+/)[0] ?? null;
+  const allergies = user?.allergies?.trim();
+  const hasAllergies = !!allergies && !/^(none|nil|nka|nkda|no)$/i.test(allergies);
+  const dose = nextDose(medications);
+  const currentMeds = medications.filter(isCurrent);
+  const latestLab = labs[0] ?? null;
 
   return (
     <View className="flex-1 bg-white">
       <Header
         onRightAction={() =>
-          Alert.alert(
-            "Notification Center",
-            "2 new alerts from Dr. Bello and SYNLAB"
-          )
+          Alert.alert("Notifications", "Notifications are not available yet.")
         }
         rightAction="notifications"
-        title="Good morning, Adaeze"
+        title={greeting(firstName)}
       />
-      <ScrollView className="flex-1" contentContainerClassName="px-[22px] pb-10 pt-5">
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="px-[22px] pb-10 pt-5"
+        refreshControl={
+          <RefreshControl
+            onRefresh={() => {
+              refresh();
+              loadAppointments();
+            }}
+            refreshing={refreshing}
+          />
+        }
+      >
         <ScreenStack>
           <Card className="border-[#031f50] bg-[#031f50] p-5">
             <View className="flex-row items-center justify-between">
@@ -38,20 +115,23 @@ export default function HomeScreen() {
               <Icon size={28} src={icons.fingerprint} />
             </View>
             <Text className="mt-5 text-[27px] font-semibold tracking-[0.02em] text-white">
-              WR-4821-0936
+              {user?.wrId ?? user?.memberId ?? "—"}
             </Text>
             <Text className="mt-3 text-xs leading-[1.45] text-[#e0e9f8]">
               One patient. One trusted record.{"\n"}Accessible when it
               matters.
             </Text>
-            <View className="mt-5 flex-row flex-wrap gap-2">
-              <Text className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
-                Synced today, 08:42
-              </Text>
-              <Text className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
-                Available offline
-              </Text>
-            </View>
+            {loadedAt && (
+              <View className="mt-5 flex-row flex-wrap gap-2">
+                <Text className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
+                  Synced{" "}
+                  {loadedAt.toLocaleTimeString("en-GB", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </Text>
+              </View>
+            )}
           </Card>
 
           <View className="flex-row justify-between">
@@ -84,76 +164,110 @@ export default function HomeScreen() {
           <Card>
             <View className="flex-row gap-4">
               <View className="flex-1">
-                <Text className="text-2xl font-bold text-[#031f50]">O+</Text>
+                <Text className="text-2xl font-bold text-[#031f50]">
+                  {user?.bloodType ?? "—"}
+                </Text>
                 <Text className="text-xs text-[#53657c]">Blood group</Text>
               </View>
               <View className="flex-1">
-                <Text className="text-2xl font-bold text-[#031f50]">AA</Text>
+                <Text className="text-2xl font-bold text-[#031f50]">
+                  {user?.genotype ?? "—"}
+                </Text>
                 <Text className="text-xs text-[#53657c]">Genotype</Text>
               </View>
             </View>
             <View className="mt-3 flex-row flex-wrap gap-2">
-              <Badge tone="red">Penicillin allergy</Badge>
-              <Badge>Hypertension</Badge>
+              {hasAllergies ? (
+                <Badge tone="red">Allergies: {allergies}</Badge>
+              ) : (
+                <Badge>No allergies recorded</Badge>
+              )}
             </View>
-            <Text className="mt-3 text-xs text-[#53657c]">
-              Alert: penicillin caused a rash · Provider confirmed
-            </Text>
           </Card>
 
           <SectionTitle action="View timeline" onAction={() => router.push("/timeline")}>
             Next in your care
           </SectionTitle>
           <Card className="gap-4">
-            <Row
-              detail={
-                careStage === "checkedIn"
-                  ? "Checked in · Waiting for triage at Lagoon Hospital"
-                  : "Mon, 5 Oct · 10:30 AM · Lagoon Hospital, Ikeja"
-              }
-              icon={icons.calendar}
-              onPress={() =>
-                router.push(
-                  careStage === "checkedIn"
-                    ? "/care-journey"
-                    : careStage === "booked"
-                      ? "/booking-confirmed"
-                      : "/booking-time"
-                )
-              }
-              title={
-                careStage === "checkedIn"
-                  ? "Visit with Dr Amaka Bello"
-                  : careStage === "booked"
-                    ? "Booked · Follow-up with Dr Amaka Bello"
-                    : "Follow-up with Dr Amaka Bello"
-              }
-            />
+            {appointment ? (
+              <Row
+                detail={[appointmentWhen(appointment), appointment.facilityName]
+                  .filter(Boolean)
+                  .join(" · ")}
+                icon={icons.calendar}
+                title={
+                  appointment.status === "requested"
+                    ? "Appointment requested"
+                    : "Upcoming appointment"
+                }
+              />
+            ) : (
+              <Row
+                detail={
+                  apptState === "error"
+                    ? "Could not load appointments. Pull down to retry."
+                    : "Book a visit with a participating provider"
+                }
+                icon={icons.calendar}
+                onPress={() => router.push("/(tabs)/care-discovery")}
+                title="No upcoming appointments"
+              />
+            )}
             <View className="h-px bg-[#dae2ee]" />
-            <Row
-              detail="Next dose today at 8:00 PM · After food"
-              icon={icons.pill}
-              onPress={() => router.push("/medications")}
-              title="Ferrous sulfate · 200 mg"
-            />
+            {dose ? (
+              <Row
+                detail={`Next dose today at ${clockLabel(dose.time)}`}
+                icon={icons.pill}
+                onPress={() => router.push("/medications")}
+                title={[dose.med.medicationName, dosageText(dose.med)]
+                  .filter(Boolean)
+                  .join(" · ")}
+              />
+            ) : (
+              <Row
+                detail={
+                  currentMeds.length > 0
+                    ? `${currentMeds.length} current ${currentMeds.length === 1 ? "medication" : "medications"}`
+                    : "Nothing recorded yet"
+                }
+                icon={icons.pill}
+                onPress={() => router.push("/medications")}
+                title="Medications"
+              />
+            )}
           </Card>
 
           <SectionTitle action="View all" onAction={() => router.push("/reports")}>
             Recent record activity
           </SectionTitle>
-          <Card onPress={() => router.push("/reports")}>
-            <Row
-              detail="SYNLAB Ikeja · 29 Sep 2026"
-              icon={icons.lab}
-              title="Full blood count added"
-            />
-            <View className="mt-3 flex-row items-center justify-between gap-2">
-              <Badge>Verified provider</Badge>
-              <Text className="text-[11px] text-[#53657c]">
-                Shared with Dr Bello · 24 hours
+          {latestLab ? (
+            <Card
+              onPress={() =>
+                router.push({ pathname: "/result", params: { id: latestLab._id } })
+              }
+            >
+              <Row
+                detail={[labDate(latestLab), latestLab.organizationName]
+                  .filter(Boolean)
+                  .join(" · ")}
+                icon={icons.lab}
+                title={`${latestLab.testName} · ${labValue(latestLab)}`}
+              />
+              <View className="mt-3">
+                <Badge>
+                  {latestLab.verificationStatus === "verified"
+                    ? "Verified provider"
+                    : "Provider submitted"}
+                </Badge>
+              </View>
+            </Card>
+          ) : (
+            <Card>
+              <Text className="text-sm text-[#53657c]">
+                No results yet. Results your provider submits appear here.
               </Text>
-            </View>
-          </Card>
+            </Card>
+          )}
         </ScreenStack>
       </ScrollView>
     </View>

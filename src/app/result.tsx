@@ -138,9 +138,14 @@ export default function ResultScreen() {
                 <Text className="mt-2 text-lg font-bold text-[#031f50]">
                   {lab.testName} · {labDate(lab)}
                 </Text>
-                {lab.specimen && (
+                {(lab.organizationName || lab.specimen) && (
                   <Text className="mt-2 text-xs text-[#53657c]">
-                    Specimen: {lab.specimen}
+                    {[
+                      lab.organizationName,
+                      lab.specimen ? `Specimen: ${lab.specimen}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </Text>
                 )}
                 <View className="mt-4 flex-row flex-wrap items-center gap-2">
@@ -200,7 +205,7 @@ export default function ResultScreen() {
 
               <Card onPress={() => router.push("/reports")}>
                 <Row
-                  detail={`Collected ${labDate(lab)}`}
+                  detail={[lab.organizationName, `Collected ${labDate(lab)}`].filter(Boolean).join(" · ")}
                   icon={icons.report}
                   title={`Original ${lab.testName}`}
                 />

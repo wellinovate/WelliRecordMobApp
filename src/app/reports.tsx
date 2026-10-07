@@ -64,6 +64,7 @@ export default function ReportsScreen() {
           !q ||
           l.testName.toLowerCase().includes(q) ||
           (l.category ?? "").toLowerCase().includes(q) ||
+          (l.organizationName ?? "").toLowerCase().includes(q) ||
           labDate(l).toLowerCase().includes(q)
       ),
     [labs, q]
@@ -102,7 +103,7 @@ export default function ReportsScreen() {
             <TextInput
               className="flex-1 text-sm text-[#031f50]"
               onChangeText={setSearch}
-              placeholder="Search a test or date"
+              placeholder="Search a test, provider or date"
               placeholderTextColor="#718096"
               value={search}
             />
@@ -174,8 +175,9 @@ export default function ReportsScreen() {
                 {latest.testName}
               </Text>
               <Text className="mt-1 text-xs text-[#53657c]">
-                {labDate(latest)}
-                {latest.specimen ? ` · ${latest.specimen}` : ""}
+                {[labDate(latest), latest.organizationName, latest.specimen]
+                  .filter(Boolean)
+                  .join(" · ")}
               </Text>
               <View
                 className={`mt-4 rounded-xl p-3 ${
@@ -221,7 +223,9 @@ export default function ReportsScreen() {
                       {lab.testName}
                     </Text>
                     <Text className="mt-1 text-xs text-[#53657c]">
-                      {labDate(lab)}
+                      {[labDate(lab), lab.organizationName]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </Text>
                     <Text className="mt-3 text-xs text-[#53657c]">
                       {labValue(lab)}

@@ -12,6 +12,7 @@ export interface SessionUser {
   dateOfBirth: string | null
   bloodType: string | null
   genotype: string | null
+  allergies?: string | null
 }
 
 export interface AuthSession {
