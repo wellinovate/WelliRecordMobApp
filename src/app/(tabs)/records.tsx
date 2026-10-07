@@ -49,7 +49,7 @@ export default function RecordsScreen() {
         rightAction="avatar"
         title="My health records"
       />
-      <ScrollView className="flex-1" contentContainerClassName="px-[22px] pb-10 pt-5">
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" className="flex-1" contentContainerClassName="px-[22px] pb-10 pt-5">
         <ScreenStack>
           <View className="h-[52px] flex-row items-center gap-3 rounded-[14px] border border-[#dae2ee] bg-white px-4">
             <Icon src={icons.search} />

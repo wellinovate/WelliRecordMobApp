@@ -48,6 +48,9 @@ export default function HealthPassportScreen() {
     <View className="flex-1 bg-white">
       <Header canGoBack title="Your Health Passport" />
       <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         className="flex-1"
         contentContainerClassName="px-[22px] pb-10 pt-5"
       >

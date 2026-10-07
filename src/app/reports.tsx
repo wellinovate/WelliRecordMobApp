@@ -59,6 +59,9 @@ export default function ReportsScreen() {
     <View className="flex-1 bg-white">
       <Header canGoBack title="Lab results" />
       <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         className="flex-1"
         contentContainerClassName="px-[22px] pb-10 pt-5"
       >

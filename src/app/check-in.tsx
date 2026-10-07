@@ -24,6 +24,9 @@ export default function CheckInScreen() {
     <View className="flex-1 bg-white">
       <Header canGoBack title="Visit check-in" />
       <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         className="flex-1"
         contentContainerClassName="px-[22px] pb-10 pt-5"
       >

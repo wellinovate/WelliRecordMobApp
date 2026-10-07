@@ -19,7 +19,7 @@ export default function CreateAccountScreen() {
   return (
     <View className="flex-1 bg-white">
       <Header canGoBack title="Create your account" />
-      <ScrollView className="flex-1" contentContainerClassName="px-[22px] pb-10 pt-5">
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" className="flex-1" contentContainerClassName="px-[22px] pb-10 pt-5">
         <ScreenStack>
           <View>
             <Text className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#53657c]">

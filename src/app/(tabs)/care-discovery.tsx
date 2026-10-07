@@ -23,6 +23,9 @@ export default function CareDiscoveryScreen() {
     <View className="flex-1 bg-white">
       <Header rightAction="avatar" title="Find care near you" />
       <ScrollView
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         className="flex-1"
         contentContainerClassName="px-[22px] pb-10 pt-5"
       >
