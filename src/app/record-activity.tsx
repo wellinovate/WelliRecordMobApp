@@ -1,81 +1,86 @@
-import React, { useState } from "react";
-import { View, Text, Pressable, ScrollView } from "react-native";
+import React, { useMemo } from "react";
+import { View, Text, ScrollView, RefreshControl } from "react-native";
 import { Header } from "../components/navigation/Header";
 import {
   Badge,
   Card,
   Guidance,
-  PrimaryButton,
   Row,
   ScreenStack,
 } from "../components/common";
 import { icons } from "../constants/icons";
-import { useWelli } from "../state/WelliContext";
-import { hapticFeedback } from "../utils/haptics";
+import { useGrants } from "../hooks/useGrants";
+import {
+  grantDateTime,
+  liveStatus,
+  scopeLabel,
+  type Grant,
+} from "../services/consentService";
 
-const activityItems = [
-  [
-    "You shared with Dr Amaka Bello",
-    "3 Oct 2026 · 9:41 AM",
-    "Laboratory, medicines & consultations",
-    "Purpose: treatment follow-up · 24 hours",
-    "C-1031 · Ends 4 Oct, 9:41 AM",
-    "share",
-  ],
-  [
-    "Chidi Okafor viewed your record",
-    "2 Oct 2026 · 8:10 PM",
-    "Current medication list",
-    "Purpose: family support",
-    "C-1024 · Caregiver grant to 31 Oct",
-    "view",
-  ],
-  [
-    "You revoked CityCare Clinic",
-    "30 Sep 2026 · 4:20 PM",
-    "Laboratory access ended immediately",
-    "Reason: no longer needed · Added by you",
-    "C-1018 · Revoked by patient",
-    "revoke",
-  ],
-  [
-    "HealthPlus viewed a prescription",
-    "30 Sep 2026 · 11:05 AM",
-    "Ferrous sulfate prescription · 28 Sep",
-    "Purpose: dispensing · One-time access",
-    "C-1026 · Used, now expired",
-    "medicine",
-  ],
-  [
-    "SYNLAB added your laboratory report",
-    "29 Sep 2026 · 1:42 PM",
-    "Full blood count · SL-290926-184",
-    "Purpose: delivering your ordered test result",
-    "C-1025 · Provider deposit permission",
-    "add",
-  ],
-] as const;
+interface Entry {
+  key: string;
+  at: string;
+  title: string;
+  detail: string;
+  icon: (typeof icons)[keyof typeof icons];
+}
 
-const activityIcon: Record<string, (typeof icons)[keyof typeof icons]> = {
-  share: icons.send,
-  view: icons.activityEye,
-  revoke: icons.activityShieldX,
-  medicine: icons.pill,
-  add: icons.files,
-};
+// The activity list is built from consent changes the server records on each
+// grant. Provider views are not logged by the backend yet, so none appear.
+function entriesFor(g: Grant): Entry[] {
+  const out: Entry[] = [];
+  const scope = scopeLabel(g);
+  out.push({
+    key: `${g.id}-created`,
+    at: g.createdAt,
+    title: g.requestedByProvider
+      ? `${g.granteeName} requested access`
+      : `You shared with ${g.granteeName}`,
+    detail: scope,
+    icon: icons.send,
+  });
+  if (g.reviewedAt && g.requestedByProvider) {
+    out.push({
+      key: `${g.id}-reviewed`,
+      at: g.reviewedAt,
+      title:
+        g.status === "rejected"
+          ? `You rejected ${g.granteeName}`
+          : `You approved ${g.granteeName}`,
+      detail: g.rejectionReason ?? scope,
+      icon: icons.recordLab,
+    });
+  }
+  if (g.revokedAt) {
+    out.push({
+      key: `${g.id}-revoked`,
+      at: g.revokedAt,
+      title: `You revoked ${g.granteeName}`,
+      detail: "Future access ended",
+      icon: icons.activityShieldX,
+    });
+  } else if (liveStatus(g) === "expired" && g.expiresAt) {
+    out.push({
+      key: `${g.id}-expired`,
+      at: g.expiresAt,
+      title: `Access for ${g.granteeName} expired`,
+      detail: scope,
+      icon: icons.pill,
+    });
+  }
+  return out;
+}
 
 export default function RecordActivityScreen() {
-  const { activeConsent, pendingConsent } = useWelli();
-  const [filter, setFilter] = useState("All activity");
-  const [downloading, setDownloading] = useState(false);
+  const { grants, loading, error, reload } = useGrants();
 
-  const handleDownload = async () => {
-    hapticFeedback.success();
-    setDownloading(true);
-    // Demo-mode stand-in for a real PDF export job.
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    setDownloading(false);
-  };
+  const entries = useMemo(
+    () =>
+      grants
+        .flatMap(entriesFor)
+        .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()),
+    [grants]
+  );
 
   return (
     <View className="flex-1 bg-white">
@@ -83,93 +88,40 @@ export default function RecordActivityScreen() {
       <ScrollView
         className="flex-1"
         contentContainerClassName="px-[22px] pb-10 pt-5"
+        refreshControl={<RefreshControl onRefresh={reload} refreshing={false} />}
       >
         <ScreenStack>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View className="flex-row gap-2 pb-1">
-              {["All activity", "Last 30 days", "Filters"].map((item) => (
-                <Pressable
-                  accessibilityRole="button"
-                  className={`rounded-full border px-3 py-2 ${
-                    filter === item
-                      ? "border-[#031f50] bg-[#031f50]"
-                      : "border-[#dae2ee] bg-white"
-                  }`}
-                  key={item}
-                  onPress={() => setFilter(item)}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      filter === item ? "text-white" : "text-[#031f50]"
-                    }`}
-                  >
-                    {item}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
-
-          <Guidance title="An access history you can understand">
+          <Guidance title="Consent history">
             <Text className="text-[13px] leading-[1.45] text-[#173b71]">
-              Each entry links the recipient, selected scope, purpose,
-              duration and consent. Provider additions keep their original
-              source.
+              Each entry is a consent change: shared, requested, approved,
+              rejected, revoked or expired.
             </Text>
           </Guidance>
 
-          {!activeConsent && (
-            <Card>
-              <Row
-                detail="Today · Confirmed by you"
-                icon={icons.activityShieldX}
-                title="You revoked Dr Amaka Bello"
-              />
-              <Text className="mt-4 text-sm font-semibold text-[#173b71]">
-                Future access under C-1031 ended
+          {error && (
+            <Guidance title="Could not load activity" tone="amber">
+              <Text className="text-[13px] leading-[1.45] text-[#936020]">
+                {error} Pull down to retry.
               </Text>
-              <View className="mt-3">
-                <Badge tone="red">Revoked</Badge>
-              </View>
-            </Card>
+            </Guidance>
           )}
 
-          {pendingConsent !== "pending" && (
+          {!loading && !error && entries.length === 0 && (
             <Card>
-              <Row
-                detail="Today · Consent request C-1032"
-                icon={icons.recordLab}
-                title={`You ${pendingConsent} SYNLAB Ikeja's request`}
-              />
-              <Text className="mt-4 text-xs text-[#53657c]">
-                {pendingConsent === "approved"
-                  ? "Laboratory-only access granted for 30 days."
-                  : "No record access was granted."}
+              <Text className="text-sm text-[#53657c]">
+                No consent activity yet.
               </Text>
             </Card>
           )}
 
-          {activityItems.map(([title, date, scope, purpose, consent, icon]) => (
-            <Card key={title}>
-              <Row detail={date} icon={activityIcon[icon]} title={title} />
+          {entries.map((e) => (
+            <Card key={e.key}>
+              <Row detail={grantDateTime(e.at)} icon={e.icon} title={e.title} />
               <Text className="mt-4 text-sm font-semibold text-[#173b71]">
-                {scope}
+                {e.detail}
               </Text>
-              <Text className="mt-2 text-xs text-[#53657c]">{purpose}</Text>
-              <View className="mt-3">
-                <Badge>{consent}</Badge>
-              </View>
             </Card>
           ))}
-
-          <PrimaryButton disabled={downloading} onPress={handleDownload}>
-            {downloading
-              ? "Preparing NDPR audit log…"
-              : "Download my access history"}
-          </PrimaryButton>
-          <Text className="text-center text-xs text-[#53657c]">
-            Questions about an access? Flag the entry for review.
-          </Text>
         </ScreenStack>
       </ScrollView>
     </View>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react"
 import { router } from "expo-router"
-import { CareStage, PendingConsent } from "../types/navigation"
+import { CareStage } from "../types/navigation"
 import { hapticFeedback } from "../utils/haptics"
 import { storage } from "../utils/storage"
 import { offlineSyncService, EmergencyOfflineProfile } from "../services/offlineSyncService"
@@ -20,8 +20,6 @@ interface WelliContextType {
   setupFlow: boolean
   recordAdded: boolean
   careStage: CareStage
-  activeConsent: boolean
-  pendingConsent: PendingConsent
   emergencyActive: boolean
   isOffline: boolean
   emergencyProfile: EmergencyOfflineProfile | null
@@ -36,9 +34,6 @@ interface WelliContextType {
   signOut: () => void
   confirmBooking: () => void
   confirmCheckIn: () => void
-  confirmRevocation: () => void
-  approveConsent: () => void
-  rejectConsent: () => void
   activateEmergency: () => void
   endEmergency: () => void
 }
@@ -69,8 +64,6 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
   const [setupFlow, setSetupFlow] = useState(false)
   const [recordAdded, setRecordAdded] = useState(false)
   const [careStage, setCareStage] = useState<CareStage>("scheduled")
-  const [activeConsent, setActiveConsent] = useState(true)
-  const [pendingConsent, setPendingConsent] = useState<PendingConsent>("pending")
   const [emergencyActive, setEmergencyActive] = useState(false)
   const [isOffline, setIsOffline] = useState(false)
   const [emergencyProfile, setEmergencyProfile] = useState<EmergencyOfflineProfile | null>(null)
@@ -208,22 +201,6 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
     router.push("/checked-in")
   }
 
-  const confirmRevocation = () => {
-    hapticFeedback.warning()
-    setActiveConsent(false)
-    router.push("/(tabs)/consent-expanded")
-  }
-
-  const approveConsent = () => {
-    hapticFeedback.success()
-    setPendingConsent("approved")
-  }
-
-  const rejectConsent = () => {
-    hapticFeedback.warning()
-    setPendingConsent("rejected")
-  }
-
   const activateEmergency = () => {
     hapticFeedback.heavy()
     setEmergencyActive(true)
@@ -245,8 +222,6 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
         setupFlow,
         recordAdded,
         careStage,
-        activeConsent,
-        pendingConsent,
         emergencyActive,
         isOffline,
         emergencyProfile,
@@ -259,9 +234,6 @@ export function WelliProvider({ children }: { children: React.ReactNode }) {
         signOut,
         confirmBooking,
         confirmCheckIn,
-        confirmRevocation,
-        approveConsent,
-        rejectConsent,
         activateEmergency,
         endEmergency,
       }}

@@ -140,7 +140,11 @@ export default function HealthPassportScreen() {
             </Text>
           </Guidance>
 
-          <PrimaryButton onPress={() => router.push("/share-confirmed")}>
+          <PrimaryButton
+            onPress={() =>
+              Alert.alert("PDF export", "PDF export is not available yet.")
+            }
+          >
             Preview & export selected PDF
           </PrimaryButton>
           <SecondaryButton
