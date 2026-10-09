@@ -6,6 +6,7 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from "react-native";
 import { router } from "expo-router";
 import { Header } from "../components/navigation/Header";
@@ -21,6 +22,7 @@ import {
   CATEGORY_OPTIONS,
   DURATION_OPTIONS,
   createGrant,
+  requestShareCode,
 } from "../services/consentService";
 import { hapticFeedback } from "../utils/haptics";
 
@@ -61,6 +63,9 @@ export default function ShareProviderScreen() {
   const [category, setCategory] = useState("lab-results");
   const [days, setDays] = useState(7);
   const [saving, setSaving] = useState(false);
+  // After "Continue" a code is sent and the person must enter it to share.
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
   useEffect(() => {
     fetchProviders()
@@ -74,6 +79,22 @@ export default function ShareProviderScreen() {
     [providers, providerId]
   );
 
+  const sendCode = async () => {
+    setSaving(true);
+    try {
+      const res = await requestShareCode();
+      setSentTo(res.sentTo);
+      setCode("");
+    } catch (e) {
+      Alert.alert(
+        "Could not send the code",
+        e instanceof Error ? e.message : "Try again."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submit = async () => {
     if (!selected) return;
     setSaving(true);
@@ -83,6 +104,7 @@ export default function ShareProviderScreen() {
         accessScope: scope,
         category: scope === "category" ? category : undefined,
         durationDays: days,
+        code: code.trim(),
       });
       hapticFeedback.success();
       router.replace({ pathname: "/share-confirmed", params: { id: grant.id } });
@@ -192,9 +214,44 @@ export default function ShareProviderScreen() {
             </Text>
           </Guidance>
 
-          <PrimaryButton disabled={!selected || saving} onPress={submit}>
-            {saving ? "Sharing…" : "Share"}
-          </PrimaryButton>
+          {sentTo ? (
+            <>
+              <Guidance title="Confirm with your code">
+                <Text className="text-[13px] leading-[1.45] text-[#173b71]">
+                  We sent a 6-digit code to {sentTo}. Enter it to share.
+                </Text>
+              </Guidance>
+              <TextInput
+                accessibilityLabel="Confirmation code"
+                className="rounded-[14px] border border-[#dae2ee] px-4 py-3 text-center text-xl tracking-[0.3em] text-[#031f50]"
+                keyboardType="number-pad"
+                maxLength={6}
+                onChangeText={setCode}
+                placeholder="000000"
+                value={code}
+              />
+              <PrimaryButton
+                disabled={saving || code.trim().length !== 6}
+                onPress={submit}
+              >
+                {saving ? "Sharing…" : "Confirm and share"}
+              </PrimaryButton>
+              <Pressable
+                accessibilityRole="button"
+                className="items-center py-2"
+                disabled={saving}
+                onPress={sendCode}
+              >
+                <Text className="text-xs font-semibold text-[#24518c]">
+                  Send a new code
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <PrimaryButton disabled={!selected || saving} onPress={sendCode}>
+              {saving ? "Sending code…" : "Continue"}
+            </PrimaryButton>
+          )}
         </ScreenStack>
       </ScrollView>
     </View>

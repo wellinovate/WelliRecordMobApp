@@ -33,6 +33,8 @@ export interface ShareInput {
   category?: string
   durationDays: number
   purpose?: string
+  // One-time code from requestShareCode(); the server rejects a share without it.
+  code: string
 }
 
 type GrantResponse = { success: boolean; grant: Grant }
@@ -61,6 +63,21 @@ export async function fetchGrants(): Promise<Grant[]> {
     "/access/grants"
   )
   return res.grants ?? []
+}
+
+export interface ShareCodeResult {
+  channel: "email" | "sms"
+  sentTo: string
+}
+
+// Sends the patient a confirmation code (email if on file, otherwise SMS).
+export async function requestShareCode(): Promise<ShareCodeResult> {
+  const res = await apiRequest<{
+    success: boolean
+    channel: "email" | "sms"
+    sentTo: string
+  }>("/access/grants/code", { method: "POST", body: {} })
+  return { channel: res.channel, sentTo: res.sentTo }
 }
 
 export async function createGrant(input: ShareInput): Promise<Grant> {
